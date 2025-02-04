@@ -190,7 +190,7 @@ Here I had a release build of an example application running, and just ran Bench
 
 ## How Does This Work?
 
-After and exhaustive amount of reading, I think I finally understand what is happening when you pass a `Delegate` to the `MapGet` function (not to be confused with the option to pass a `RequestDelegate`). Long story short, AspNetCore checks a large variety of details of the reflection definition of the function you pass, such as the input and output types as well as if there are attributes. It makes a series of decisions as to where to get parameters from (i.e. route, headers, query, body, di services etc.) and COMPILES a new `RequestDelegate` that wraps your original `Delegate`. So knowing that I figured that if I could compile a static method `Delegate` dynamically based on the parameters of my instance classes method, that I could pass that to the standard `MapMethods` method and let AspNetCore work exactly as expected to resolve DI and setup all the parameters.
+After an extensive amount of reading, I think I finally understand what is happening when you pass a `Delegate` to the `MapGet` function (not to be confused with the option to pass a `RequestDelegate`). Long story short, AspNetCore checks a large variety of details of the reflection definition of the function you pass, such as the input and output types as well as if there are attributes. It makes a series of decisions as to where to get parameters from (i.e. route, headers, query, body, di services etc.) and COMPILES a new `RequestDelegate` that wraps your original `Delegate`. So knowing that I figured that if I could compile a static method `Delegate` dynamically based on the parameters of my instance classes method, that I could pass that to the standard `MapMethods` method and let AspNetCore work exactly as expected to resolve DI and setup all the parameters.
 
 i.e. given the signature 
 
@@ -299,7 +299,7 @@ public class DelegateGenerator
             methodParams[i + 1] = parameters[i].ParameterType;
 
         // Define a new type that will hold the static method
-        var typeBuilder = ModuleBuilder.DefineType($"{targetType.Name}_Invoker", TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
+        var typeBuilder = ModuleBuilder.DefineType(GetUniqueName($"{targetType.Name}_Invoker"), TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
 
         // Define the static method
         var methodBuilder = typeBuilder.DefineMethod(
@@ -333,6 +333,24 @@ public class DelegateGenerator
             }
         }
 
+        
+        foreach (var customAttribute in methodInfo.CustomAttributes)
+        {
+            ConstructorInfo customCtor = customAttribute.Constructor;
+            if (customCtor is not null)
+            {
+                var customAttr = new CustomAttributeBuilder(customCtor, customAttribute.ConstructorArguments.Select(y => {
+                    if (y.Value is IEnumerable<CustomAttributeTypedArgument> c)
+                    {
+                        return c.Select(x => (string)x.Value!).ToArray();
+                    }
+
+                    return (object?)y.Value;
+            }).ToArray());
+
+                methodBuilder.SetCustomAttribute(customAttr);
+            }
+        }
 
         // I don't know reflection.emit very well so i ripped this part from GPT.
         // Generate IL to call instance method
@@ -362,6 +380,16 @@ public class DelegateGenerator
 
         // Return delegate pointing to generated static method
         return Delegate.CreateDelegate(delegateType, generatedMethod);
+    }
+
+
+    private static string GetUniqueName(string nameBase)
+    {
+        int number = 2;
+        string name = nameBase;
+        while (ModuleBuilder.GetType(name) != null)
+            name = nameBase + number++;
+        return name;
     }
 }
 ```
