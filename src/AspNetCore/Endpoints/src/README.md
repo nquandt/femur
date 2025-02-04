@@ -188,6 +188,15 @@ public class Bench
 
 Here I had a release build of an example application running, and just ran BenchmarkDotNet against that.. It's probably not the ideal test, but it shows that from an integrations standpoint there is no statistically relevant difference between the two implementations.
 
+I also decided to pull the FastEndpoints repo down and duplicated the MinimalApi benchmark to include my own in the output, again seeing its on par with standard MinimalApi delegates and not adding any substantial overhead.
+
+| Method        | Mean     | Error    | StdDev   | Ratio | RatioSD | Gen0   | Allocated | Alloc Ratio |
+|-------------- |---------:|---------:|---------:|------:|--------:|-------:|----------:|------------:|
+| FastEndpoints | 36.97 us | 0.729 us | 1.522 us |  1.00 |    0.06 | 2.4414 |   15.2 KB |        1.00 |
+| MinimalApi    | 30.59 us | 0.592 us | 0.681 us |  0.83 |    0.04 | 2.1973 |  14.75 KB |        0.97 |
+| FemurEndpoint | 29.98 us | 0.576 us | 0.511 us |  0.81 |    0.03 | 2.1973 |  14.79 KB |        0.97 |
+| AspNetCoreMvc | 51.60 us | 0.643 us | 0.570 us |  1.40 |    0.06 | 3.4180 |   22.1 KB |        1.45 |
+
 ## How Does This Work?
 
 After an extensive amount of reading, I think I finally understand what is happening when you pass a `Delegate` to the `MapGet` function (not to be confused with the option to pass a `RequestDelegate`). Long story short, AspNetCore checks a large variety of details of the reflection definition of the function you pass, such as the input and output types as well as if there are attributes. It makes a series of decisions as to where to get parameters from (i.e. route, headers, query, body, di services etc.) and COMPILES a new `RequestDelegate` that wraps your original `Delegate`. So knowing that I figured that if I could compile a static method `Delegate` dynamically based on the parameters of my instance classes method, that I could pass that to the standard `MapMethods` method and let AspNetCore work exactly as expected to resolve DI and setup all the parameters.
