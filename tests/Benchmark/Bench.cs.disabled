@@ -1,0 +1,194 @@
+
+
+// using System.Linq.Expressions;
+// using System.Reflection;
+// using System.Reflection.Emit;
+// using BenchmarkDotNet.Attributes;
+
+// [MemoryDiagnoser]
+// public class Bench
+// {
+//     private static readonly MyClass _instance;
+//     private static readonly Delegate _delegate;
+//     static Bench()
+//     {
+//         _instance = new MyClass(2);
+//         _delegate = DelegateGenerator.CreateStaticDelegate(typeof(MyClass), "HandleAsync");
+//     }
+
+//     [Benchmark]
+//     public async Task<int> Do()
+//     {        
+//         return await (Task<int>)_delegate.DynamicInvoke([_instance, 2])!;
+//     }
+
+//     [Benchmark]
+//     public async Task<int> DoStatic()
+//     {
+//         return await MyClass.DoStatic(_instance, 2);
+//     }
+// }
+
+
+// public class MyClass
+// {
+//     private readonly int _j;
+//     public MyClass(int j)
+//     {
+//         _j = j;
+//     }
+//     public static async Task<int> DoStatic(MyClass instance, int i)
+//     {
+//         return await instance.HandleAsync(i);
+//     }
+
+//     public Task<int> HandleAsync(int i)
+//     {
+//         return Task.FromResult(i + _j);
+//     }
+// }
+
+// public class DelegateGenerator
+// {
+//     public static Type CreateDelegateType(Type targetType, string methodName)
+//     {
+//         // Get the method info dynamically
+//         MethodInfo? methodInfo = targetType.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+//         if (methodInfo == null)
+//             throw new InvalidOperationException($"Method '{methodName}' not found in type '{targetType.FullName}'.");
+
+//         // Extract parameters and return type
+//         ParameterInfo[] parameters = methodInfo.GetParameters();
+//         Type returnType = methodInfo.ReturnType;
+
+//         if (returnType.IsAssignableFrom(typeof(Task)))
+//             throw new InvalidOperationException($"Method '{methodName}' must return a Task.");
+
+//         // Construct parameter list: first parameter is the target type (instance), rest are from method
+//         Type[] delegateParams = new Type[parameters.Length + 1];
+//         delegateParams[0] = targetType;
+//         for (int i = 0; i < parameters.Length; i++)
+//         {
+//             delegateParams[i + 1] = parameters[i].ParameterType;
+//         }
+
+//         // Define dynamic assembly and module
+//         var assemblyName = new AssemblyName("DynamicDelegates");
+//         var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+//         var moduleBuilder = assemblyBuilder.DefineDynamicModule("MainModule");
+
+//         // Define the delegate type dynamically
+//         var typeBuilder = moduleBuilder.DefineType(
+//             $"{targetType.Name}_{methodName}_Delegate",
+//             TypeAttributes.Class | TypeAttributes.Public | TypeAttributes.Sealed,
+//             typeof(MulticastDelegate));
+
+//         // Define constructor for delegate
+//         var constructorBuilder = typeBuilder.DefineConstructor(
+//             MethodAttributes.RTSpecialName | MethodAttributes.HideBySig | MethodAttributes.Public,
+//             CallingConventions.Standard,
+//             new[] { typeof(object), typeof(IntPtr) });
+
+//         constructorBuilder.SetImplementationFlags(MethodImplAttributes.Runtime | MethodImplAttributes.Managed);
+
+//         // Define the Invoke method dynamically
+//         var methodBuilder = typeBuilder.DefineMethod(
+//             "Invoke",
+//             MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig,
+//             returnType,
+//             delegateParams);
+
+//         methodBuilder.SetImplementationFlags(MethodImplAttributes.Runtime | MethodImplAttributes.Managed);
+
+//         var instanceParamBuilder = methodBuilder.DefineParameter(1, ParameterAttributes.None, "instance");
+//         // **Apply [FromServices] attribute to the 'instance' parameter**
+//         // ConstructorInfo fromServicesCtor = typeof(FromServicesAttribute).GetConstructor(Type.EmptyTypes)!;
+//         // if (fromServicesCtor != null)
+//         // {
+//         //     var fromServicesAttr = new CustomAttributeBuilder(fromServicesCtor, Array.Empty<object>());
+//         //     instanceParamBuilder.SetCustomAttribute(fromServicesAttr);
+//         // }
+
+//         for (int i = 0; i < parameters.Length; i++)
+//         {
+//             var paramBuilder = methodBuilder.DefineParameter(i + 2, ParameterAttributes.None, parameters[i].Name);
+//             foreach(var customAttribute in parameters[i].CustomAttributes.Where(x => x.AttributeType.Name.StartsWith("From")))
+//             {
+//                 ConstructorInfo customCtor = customAttribute.Constructor!;
+//                 var customAttr = new CustomAttributeBuilder(customCtor, customAttribute.ConstructorArguments.Select(y => y.Value).ToArray());
+//                 paramBuilder.SetCustomAttribute(customAttr);
+//             }
+//         }
+
+//         // Create and return the dynamically generated delegate type
+//         return typeBuilder.CreateType();
+//     }
+
+//     private static readonly ModuleBuilder ModuleBuilder;
+
+//     static DelegateGenerator()
+//     {
+//         var assemblyName = new AssemblyName("DynamicDelegatesAssembly");
+//         var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+//         ModuleBuilder = assemblyBuilder.DefineDynamicModule("MainModule");
+//     }
+
+//     public static Delegate CreateStaticDelegate(Type targetType, string methodName)
+//     {
+//         MethodInfo? methodInfo = targetType.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+//         if (methodInfo == null)
+//             throw new InvalidOperationException($"Method '{methodName}' not found in type '{targetType.FullName}'.");
+
+//         ParameterInfo[] parameters = methodInfo.GetParameters();
+//         Type[] methodParams = new Type[parameters.Length + 1];
+
+//         // First parameter is the instance
+//         methodParams[0] = targetType;
+//         for (int i = 0; i < parameters.Length; i++)
+//             methodParams[i + 1] = parameters[i].ParameterType;
+
+//         // Define a new type that will hold the static method
+//         var typeBuilder = ModuleBuilder.DefineType($"{targetType.Name}_Invoker", TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
+
+//         // Define the static method
+//         var methodBuilder = typeBuilder.DefineMethod(
+//             "Invoke",
+//             MethodAttributes.Public | MethodAttributes.Static,
+//             methodInfo.ReturnType,
+//             methodParams);
+
+//         // Set parameter names
+//         methodBuilder.DefineParameter(1, ParameterAttributes.None, "instance");
+//         for (int i = 0; i < parameters.Length; i++)
+//             methodBuilder.DefineParameter(i + 2, ParameterAttributes.None, parameters[i].Name);
+
+//         // Generate IL to call instance method
+//         ILGenerator il = methodBuilder.GetILGenerator();
+
+//         // Load the instance onto the stack
+//         il.Emit(OpCodes.Ldarg_0);
+
+//         // Load method arguments onto the stack
+//         for (int i = 0; i < parameters.Length; i++)
+//             il.Emit(OpCodes.Ldarg, i + 1);
+
+//         // Callvirt to invoke instance method
+//         il.Emit(OpCodes.Callvirt, methodInfo);
+
+//         // Return the Task result
+//         il.Emit(OpCodes.Ret);
+
+//         // Create the new type
+//         Type generatedType = typeBuilder.CreateType()!;
+
+//         // Get reference to the generated static method
+//         MethodInfo generatedMethod = generatedType.GetMethod("Invoke")!;
+
+//         // Create delegate type dynamically
+//         Type delegateType = CreateDelegateType(targetType, methodName);
+
+//         // Return delegate pointing to generated static method
+//         return Delegate.CreateDelegate(delegateType, generatedMethod);
+//     }    
+// }
+
