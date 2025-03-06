@@ -21,8 +21,12 @@ jobs:
     - name: Test
       run: dotnet test --configuration Release /p:Version=${VERSION} --no-build
     - name: Pack
-      run: dotnet pack ./src/AspNetCore/Endpoints/src/Femur.AspNetCore.Endpoints.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
+      run: |
+        dotnet pack ./src/AspNetCore/Endpoints/src/Femur.AspNetCore.Endpoints.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
+        dotnet pack ./src/Serialization/src/Femur.Serialization.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
     - name: Push
-      run: dotnet nuget push ./artifacts/Femur.AspNetCore.Endpoints.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+      run: |
+        dotnet nuget push ./artifacts/Femur.AspNetCore.Endpoints.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+        dotnet nuget push ./artifacts/Femur.Serialization.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
       env:
         NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}

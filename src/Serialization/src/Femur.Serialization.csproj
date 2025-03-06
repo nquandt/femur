@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <PackageId>Femur.Serialization</PackageId>	  
+	  <Authors>Nicholas Quandt</Authors>
+	  <Company>Quandt</Company>
+	  <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <OutputType>Library</OutputType>
+
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Femur.Serialization.Tests</_Parameter1>      
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>
