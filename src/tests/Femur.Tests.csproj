@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\Femur.Serialization.csproj" />
+    <ProjectReference Include="..\src\Femur.csproj" />
   </ItemGroup>
 
   <ItemGroup>
