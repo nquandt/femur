@@ -4,11 +4,23 @@
     <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <PackageId>Femur.AspNetCore</PackageId>	  
+	  <Authors>Nicholas Quandt</Authors>
+	  <Company>Quandt</Company>
+	  <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <OutputType>Library</OutputType>
+
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Femur.csproj" />
     <ProjectReference Include="..\Endpoints\src\Femur.AspNetCore.Endpoints.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\"/>
   </ItemGroup>
 
 </Project>
