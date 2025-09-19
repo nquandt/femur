@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Femur.csproj" />
+    <ProjectReference Include="..\..\Hosting\Web\src\Femur.Hosting.Web.csproj" />
     <ProjectReference Include="..\Endpoints\src\Femur.AspNetCore.Endpoints.csproj" />
   </ItemGroup>
 
