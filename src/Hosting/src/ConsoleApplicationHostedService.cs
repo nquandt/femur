@@ -3,17 +3,23 @@ using Microsoft.Extensions.Logging;
 
 namespace Femur.Hosting;
 
+interface IConsoleApplicationHostedService
+{
+    int ExitCode { get; }
+}
+
+
 /// <summary>
 /// A hosted service wrapper that executes an IConsoleApplication and manages the application lifetime.
 /// </summary>
 /// <typeparam name="TApplication">The IConsoleApplication implementation to execute.</typeparam>
-internal class ConsoleApplicationHostedService<TApplication> : BackgroundService
+internal class ConsoleApplicationHostedService<TApplication> : BackgroundService, IConsoleApplicationHostedService
     where TApplication : class, IConsoleApplication
 {
     private readonly TApplication _application;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<ConsoleApplicationHostedService<TApplication>> _logger;
-    private int _exitCode = ExitCodes.Success;
+    private int _exitCode = -1;
 
     public ConsoleApplicationHostedService(
         TApplication application,

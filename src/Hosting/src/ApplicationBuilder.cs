@@ -532,7 +532,29 @@ public class ApplicationBuilder :
             return exitCode;
         }
 
-        var result = await this.RunConsoleApplicationAsync<TApplication>(bootstrapLogger);
+        // lets capture the _configureServices and then change it to inject the TApplication
+        var previousConfigureServices = this._configureServices;
+        this._configureServices = services =>
+        {
+            // If there was a previous configuration, apply it first
+            if (previousConfigureServices != null)
+            {
+                previousConfigureServices(services);
+            }
+
+            // Register the console application only if not already registered            
+            services.TryAddSingleton<TApplication>();
+
+            // Register the wrapper hosted service
+            services.AddSingleton<ConsoleApplicationHostedService<TApplication>>();
+            services.AddSingleton<IConsoleApplicationHostedService>(sp => sp.GetRequiredService<ConsoleApplicationHostedService<TApplication>>());
+            services.AddHostedService(provider =>
+                provider.GetRequiredService<ConsoleApplicationHostedService<TApplication>>());
+
+            return Task.CompletedTask;
+        };
+
+        var result = await this.RunAsConsoleApplicationAsync(bootstrapLogger);
         Environment.ExitCode = result;
         return result;
     }
@@ -577,153 +599,23 @@ public class ApplicationBuilder :
             try
             {
                 bootstrapLogger.LogInformation("Starting console application");
-                await host.RunAsync();
-            }
-            catch (Exception ex)
-            {
-                await HandleError(ex, this._onPreStartupError, ExitCodes.Messages.ConsolePreStartupError,
-                    GetLoggerFromHost(host) ?? bootstrapLogger);
-                return ExitCodes.PreStartupError;
-            }
+                
+                var consoleHostedService = host.Services.GetService<IConsoleApplicationHostedService>();
 
-            // Post-shutdown handling (this code runs after host.RunAsync() completes normally)
-            try
-            {
-                bootstrapLogger.LogInformation(ExitCodes.Messages.SuccessfulCompletion);
-            }
-            catch (Exception ex)
-            {
-                await HandleError(ex, this._onPostShutdownError, ExitCodes.Messages.ConsolePostShutdownError,
-                    GetLoggerFromHost(host) ?? bootstrapLogger);
-                return ExitCodes.PostShutdownError;
-            }
 
-            return ExitCodes.Success;
-        }
-        catch (Exception ex) when (hostBuilder == null)
-        {
-            await HandleError(ex, this._onBuilderError, ExitCodes.Messages.ConsoleBuilderCreationFailed, bootstrapLogger);
-            return ExitCodes.BuilderCreationFailed;
-        }
-        catch (Exception ex) when (host == null)
-        {
-            await HandleError(ex, this._onBuildError, ExitCodes.Messages.ConsoleBuildFailed, bootstrapLogger);
-            return ExitCodes.BuildFailed;
-        }
-        catch (Exception ex)
-        {
-            await HandleError(ex, this._onRuntimeError, ExitCodes.Messages.ConsoleRuntimeError,
-                GetLoggerFromHost(host) ?? bootstrapLogger);
-            return ExitCodes.RuntimeError;
-        }
-        finally
-        {
-            if (host != null)
-            {
-                try
-                {
-                    host.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    await HandleError(ex, this._onPostShutdownError, "Error during console application host disposal",
-                        GetLoggerFromHost(host) ?? bootstrapLogger);
-                }
-            }
 
-            if (bootstrapLogger is IDisposable disposable)
-            {
-                disposable.Dispose();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Specialized method for running IConsoleApplication implementations with exit code capture.
-    /// This method handles the complete lifecycle including registration, execution, and exit code capture.
-    /// </summary>
-    /// <typeparam name="TApplication">The IConsoleApplication implementation to run.</typeparam>
-    /// <param name="bootstrapLogger">The bootstrap logger for startup operations.</param>
-    /// <returns>
-    /// A task that represents the asynchronous operation. The task result contains the exit code from the application
-    /// or one of the standard error codes if an exception occurs during startup or shutdown.
-    /// </returns>
-    private async Task<int> RunConsoleApplicationAsync<TApplication>(ILogger bootstrapLogger)
-        where TApplication : class, IConsoleApplication
-    {
-        HostApplicationBuilder? hostBuilder = null;
-        IHost? host = null;
-        ConsoleApplicationHostedService<TApplication>? consoleHostedService = null;
-
-        try
-        {
-            bootstrapLogger.LogInformation("Creating console application host builder for type {ApplicationType}", typeof(TApplication).Name);
-            hostBuilder = Host.CreateApplicationBuilder(this._args);
-
-            if (this._configureConfiguration != null)
-            {
-                bootstrapLogger.LogInformation("Configuring console application configuration");
-                // Use GetAwaiter().GetResult() to synchronously wait for async operation
-                await this._configureConfiguration(hostBuilder.Configuration);
-            }
-
-            // Auto-register the application service and create a hosted service wrapper
-            var previousConfigureServices = this._configureServices;
-
-            bootstrapLogger.LogInformation("Configuring console application services");
-
-            // First, apply any previously configured services
-            if (previousConfigureServices != null)
-            {
-                await previousConfigureServices(hostBuilder.Services);
-            }
-
-            // Register the console application only if not already registered            
-            hostBuilder.Services.TryAddSingleton<TApplication>();
-
-            // Register the wrapper hosted service
-            hostBuilder.Services.AddSingleton<ConsoleApplicationHostedService<TApplication>>();
-            hostBuilder.Services.AddHostedService(provider =>
-                provider.GetRequiredService<ConsoleApplicationHostedService<TApplication>>());
-
-            // Configure logging in the application container using the same configuration as bootstrap
-            hostBuilder.Logging.ClearProviders();
-            this._useBootstrapLogging(hostBuilder.Logging);
-
-            bootstrapLogger.LogInformation("Building console application host");
-            host = hostBuilder.Build();
-
-            // Get reference to the console hosted service to capture exit code
-            // This can fail due to circular dependencies or other DI issues, which should be treated as build errors
-            // But it can also fail due to application constructor exceptions, which should be treated as runtime errors
-            try
-            {
-                consoleHostedService = host.Services.GetRequiredService<ConsoleApplicationHostedService<TApplication>>();
-            }
-            catch (Exception ex) when (IsApplicationConstructorError<TApplication>(ex))
-            {
-                // If the error is due to the application constructor failing, it's a runtime error, not a build error
-                await HandleError(ex, this._onRuntimeError, ExitCodes.Messages.ConsoleRuntimeError,
-                    GetLoggerFromHost(host) ?? bootstrapLogger);
-                return ExitCodes.RuntimeError;
-            }
-            catch (Exception)
-            {
-                // If service resolution fails due to DI configuration issues, it's a build error, not a runtime error
-                // Dispose the host and re-throw to be caught by the build error handler
-                host?.Dispose();
-                host = null;
-                throw;
-            }
-
-            // Pre-startup error handling
-            try
-            {
-                bootstrapLogger.LogInformation("Starting console application");
                 await host.RunAsync();
 
                 // Host has shut down gracefully, now handle any disposal errors
-                bootstrapLogger.LogInformation("Console application has shut down gracefully");
+                bootstrapLogger.LogInformation(ExitCodes.Messages.SuccessfulCompletion);
+
+                if (consoleHostedService != null)
+                {
+                    if (consoleHostedService.ExitCode != -1)
+                    {
+                        return consoleHostedService.ExitCode;
+                    }
+                }
             }
             catch (Exception ex) when (IsDisposalRelatedError(ex))
             {
@@ -739,29 +631,16 @@ public class ApplicationBuilder :
                 return ExitCodes.PreStartupError;
             }
 
-            // Post-shutdown handling (this code runs after host.RunAsync() completes normally)
-            try
-            {
-                // Capture the exit code from the console application
-                var exitCode = consoleHostedService.ExitCode;
-                bootstrapLogger.LogInformation("Console application completed with exit code {ExitCode}", exitCode);
-
-                // Explicitly dispose the host to catch any disposal errors
-                host.Dispose();
-                host = null; // Mark as disposed to avoid double disposal in finally block
-
-                return exitCode;
-            }
-            catch (Exception ex)
-            {
-                await HandleError(ex, this._onPostShutdownError, ExitCodes.Messages.ConsolePostShutdownError,
-                    GetLoggerFromHost(host) ?? bootstrapLogger);
-                return ExitCodes.PostShutdownError;
-            }
+            return ExitCodes.Success;
+        }
+        catch (Exception ex) when (hostBuilder == null)
+        {
+            await HandleError(ex, this._onBuilderError, ExitCodes.Messages.ConsoleBuilderCreationFailed, bootstrapLogger);
+            return ExitCodes.BuilderCreationFailed;
         }
         catch (Exception ex) when (host == null)
         {
-            await HandleError(ex, this._onBuildError, ExitCodes.Messages.ConsoleBuildConfigurationError, bootstrapLogger);
+            await HandleError(ex, this._onBuildError, ExitCodes.Messages.ConsoleBuildFailed, bootstrapLogger);
             return ExitCodes.BuildFailed;
         }
         catch (Exception ex)
