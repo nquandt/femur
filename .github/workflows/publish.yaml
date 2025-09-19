@@ -27,6 +27,8 @@ jobs:
         dotnet pack ./src/AspNetCore/src/Femur.AspNetCore.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/FileSystem/src/Femur.FileSystem.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/src/Femur.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
+        dotnet pack ./src/Hosting/src/Femur.Hosting.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
+        dotnet pack ./src/Hosting/Web/src/Femur.Hosting.Web.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
     - name: Push
       run: |
         dotnet nuget push ./artifacts/Femur.AspNetCore.Endpoints.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
@@ -34,5 +36,7 @@ jobs:
         dotnet nuget push ./artifacts/Femur.AspNetCore.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.FileSystem.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+        dotnet nuget push ./artifacts/Femur.Hosting.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+        dotnet nuget push ./artifacts/Femur.Hosting.Web.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
       env:
         NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}

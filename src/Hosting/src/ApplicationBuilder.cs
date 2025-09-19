@@ -599,10 +599,8 @@ public class ApplicationBuilder :
             try
             {
                 bootstrapLogger.LogInformation("Starting console application");
-                
+
                 var consoleHostedService = host.Services.GetService<IConsoleApplicationHostedService>();
-
-
 
                 await host.RunAsync();
 
@@ -621,13 +619,13 @@ public class ApplicationBuilder :
             {
                 // Disposal errors should be treated as post-shutdown errors, not pre-startup errors
                 await HandleError(ex, this._onPostShutdownError, ExitCodes.Messages.ConsolePostShutdownError,
-                    GetLoggerFromHost(host) ?? bootstrapLogger);
+                    bootstrapLogger);
                 return ExitCodes.PostShutdownError;
             }
             catch (Exception ex)
             {
                 await HandleError(ex, this._onPreStartupError, ExitCodes.Messages.ConsolePreStartupError,
-                    GetLoggerFromHost(host) ?? bootstrapLogger);
+                    bootstrapLogger);
                 return ExitCodes.PreStartupError;
             }
 
@@ -643,12 +641,12 @@ public class ApplicationBuilder :
             await HandleError(ex, this._onBuildError, ExitCodes.Messages.ConsoleBuildFailed, bootstrapLogger);
             return ExitCodes.BuildFailed;
         }
-        catch (Exception ex)
-        {
-            await HandleError(ex, this._onRuntimeError, ExitCodes.Messages.ConsoleRuntimeError,
-                GetLoggerFromHost(host) ?? bootstrapLogger);
-            return ExitCodes.RuntimeError;
-        }
+            catch (Exception ex)
+            {
+                await HandleError(ex, this._onRuntimeError, ExitCodes.Messages.ConsoleRuntimeError,
+                    bootstrapLogger);
+                return ExitCodes.RuntimeError;
+            }
         finally
         {
             if (host != null)
@@ -660,7 +658,7 @@ public class ApplicationBuilder :
                 catch (Exception ex)
                 {
                     await HandleError(ex, this._onPostShutdownError, "Error during console application host disposal",
-                        GetLoggerFromHost(host) ?? bootstrapLogger);
+                        bootstrapLogger);
                 }
             }
 
@@ -791,30 +789,6 @@ public class ApplicationBuilder :
                 await File.AppendAllTextAsync("critical-errors.log",
                     $"{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} - {message}\n");
             }
-        }
-    }
-
-    /// <summary>
-    /// Attempts to get a logger instance from the IHost's service provider.
-    /// </summary>
-    /// <param name="host">The IHost to get the logger from.</param>
-    /// <returns>A logger instance if available, otherwise null.</returns>
-    private static ILogger? GetLoggerFromHost(IHost? host)
-    {
-        try
-        {
-            if (host?.Services == null)
-            {
-                return null;
-            }
-
-            // Create a logger using the discovered program type
-            var loggerType = typeof(ILogger<>).MakeGenericType(_programType.Value);
-            return (ILogger?)host.Services.GetService(loggerType);
-        }
-        catch
-        {
-            return null;
         }
     }
 }
