@@ -20,7 +20,7 @@ public static class FemurEndpointsExtensions
 
         return l;
     }
-    public static IEndpointConventionBuilder  MapEndpoint<T>(this IEndpointRouteBuilder endpoints,
+    public static RouteHandlerBuilder MapEndpoint<T>(this IEndpointRouteBuilder endpoints,
         [StringSyntax("Route")] string routePattern,
         IEnumerable<string> httpMethods,
         Expression<Func<T, Delegate>> expression)
@@ -33,7 +33,7 @@ public static class FemurEndpointsExtensions
         return endpoints.MapMethods(routePattern, httpMethods, del);        
     }
 
-    public static IEndpointConventionBuilder  MapEndpoint<T>(this IEndpointRouteBuilder endpoints,
+    public static RouteHandlerBuilder MapEndpoint<T>(this IEndpointRouteBuilder endpoints,
         [StringSyntax("Route")] string routePattern,
         IEnumerable<HttpMethod> httpMethods,
         Expression<Func<T, Delegate>> expression)
