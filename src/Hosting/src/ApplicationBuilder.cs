@@ -23,108 +23,6 @@ public class ApplicationBuilder :
     IServicesApplicationBuilder,
     IExecutableApplicationBuilder
 {
-    private static readonly Lazy<Type> _programType = new(DiscoverProgramType);
-    private static readonly Lazy<string> _loggerCategoryName = new(() => GetLoggerCategoryName(_programType.Value));
-
-    /// <summary>
-    /// Discovers the Program class type using reflection by looking for the entry point.
-    /// </summary>
-    /// <returns>The Type of the Program class, or a fallback type if not found.</returns>
-    private static Type DiscoverProgramType()
-    {
-        try
-        {
-            // First, try to get the entry assembly
-            var entryAssembly = Assembly.GetEntryAssembly();
-            if (entryAssembly != null)
-            {
-                // Look for a class named "Program" first
-                var programType = entryAssembly.GetType("Program") ??
-                                entryAssembly.GetTypes().FirstOrDefault(t => t.Name == "Program");
-
-                if (programType != null)
-                {
-                    return programType;
-                }
-
-                // If no Program class found, try to find the entry point method
-                var entryPoint = entryAssembly.EntryPoint;
-                if (entryPoint?.DeclaringType != null)
-                {
-                    return entryPoint.DeclaringType;
-                }
-            }
-
-            // Fallback: try to find Program class in calling assembly
-            var callingAssembly = Assembly.GetCallingAssembly();
-            if (callingAssembly != null)
-            {
-                var programType = callingAssembly.GetType("Program") ??
-                                callingAssembly.GetTypes().FirstOrDefault(t => t.Name == "Program");
-
-                if (programType != null)
-                {
-                    return programType;
-                }
-            }
-
-            // Final fallback: use the stack trace to find the calling type
-            var stackTrace = new StackTrace();
-            for (var i = 0; i < stackTrace.FrameCount; i++)
-            {
-                var frame = stackTrace.GetFrame(i);
-                var method = frame?.GetMethod();
-                if (method?.DeclaringType != null
-                    && method.DeclaringType.Name == "Program"
-                    && method.Name == "Main")
-                {
-                    return method.DeclaringType;
-                }
-            }
-        }
-        catch
-        {
-            // If discovery fails, fall back to a generic type
-        }
-
-        // Ultimate fallback
-        return typeof(object);
-    }
-
-    /// <summary>
-    /// Gets an appropriate logger category name from the discovered type.
-    /// </summary>
-    /// <param name="programType">The discovered program type.</param>
-    /// <returns>A logger category name derived from the type's namespace or assembly.</returns>
-    private static string GetLoggerCategoryName(Type programType)
-    {
-        // If we have a namespace, use it (e.g., "MyApp.Program" -> "MyApp")
-        if (!string.IsNullOrEmpty(programType.Namespace))
-        {
-            // If the namespace ends with the type name, use the namespace minus the type name
-            var namespaceParts = programType.Namespace.Split('.');
-            if (namespaceParts.Length > 1 && namespaceParts.Last() == programType.Name)
-            {
-                return string.Join(".", namespaceParts.Take(namespaceParts.Length - 1));
-            }
-
-            return programType.Namespace;
-        }
-
-        // Fallback to assembly name without extensions
-        var assemblyName = programType.Assembly.GetName().Name;
-        return assemblyName ?? "Application";
-    }
-
-    /// <summary>
-    /// Gets the logger category name for the discovered program type. 
-    /// Internal for use by Web extensions.
-    /// </summary>
-    /// <returns>A logger category name derived from the discovered program type.</returns>
-    internal static string GetLoggerCategoryName()
-    {
-        return _loggerCategoryName.Value;
-    }
     private readonly string[] _args;
     private Func<IServiceCollection, Task>? _configureServices;
     private Func<IConfigurationBuilder, Task>? _configureConfiguration;
@@ -415,17 +313,9 @@ public class ApplicationBuilder :
     /// </summary>
     /// <param name="configure">The action to configure the logging builder.</param>
     /// <returns>A configured logger instance.</returns>
-    internal ILogger CreateBootstrapLogger(Action<ILoggingBuilder> configure)
+    internal BootstrapLogger CreateBootstrapLogger(Action<ILoggingBuilder> configure)
     {
-        var sc = new ServiceCollection();
-        sc.AddLogging(configure);
-        var sp = sc.BuildServiceProvider();
-
-        // Create a logger using the discovered program type
-        var loggerType = typeof(ILogger<>).MakeGenericType(_programType.Value);
-        var logger = (ILogger)sp.GetRequiredService(loggerType);
-
-        return logger;
+        return new BootstrapLogger(configure);
     }
 
     /// <summary>
@@ -446,9 +336,7 @@ public class ApplicationBuilder :
             });
             var sp = sc.BuildServiceProvider();
 
-            // Create a logger using the discovered program type or fallback
-            var loggerType = typeof(ILogger<>).MakeGenericType(_programType.Value);
-            return (ILogger)sp.GetRequiredService(loggerType);
+            return sp.GetRequiredService<ILogger>();
         }
         catch
         {
@@ -474,9 +362,9 @@ public class ApplicationBuilder :
     /// </returns>
     public async Task<int> RunAsync()
     {
-        ILogger? bootstrapLogger = null;
-
+        BootstrapLogger? bootstrapLogger = null;
         // Try to create bootstrap logger, exit early with special code if it fails
+
         try
         {
             bootstrapLogger = this.CreateBootstrapLogger(this._useBootstrapLogging);
@@ -641,12 +529,12 @@ public class ApplicationBuilder :
             await HandleError(ex, this._onBuildError, ExitCodes.Messages.ConsoleBuildFailed, bootstrapLogger);
             return ExitCodes.BuildFailed;
         }
-            catch (Exception ex)
-            {
-                await HandleError(ex, this._onRuntimeError, ExitCodes.Messages.ConsoleRuntimeError,
-                    bootstrapLogger);
-                return ExitCodes.RuntimeError;
-            }
+        catch (Exception ex)
+        {
+            await HandleError(ex, this._onRuntimeError, ExitCodes.Messages.ConsoleRuntimeError,
+                bootstrapLogger);
+            return ExitCodes.RuntimeError;
+        }
         finally
         {
             if (host != null)
@@ -712,41 +600,7 @@ public class ApplicationBuilder :
         return false;
     }
 
-    /// <summary>
-    /// Determines if an exception is caused by the application constructor failing.
-    /// </summary>
-    /// <typeparam name="TApplication">The application type.</typeparam>
-    /// <param name="ex">The exception to check.</param>
-    /// <returns>True if the exception is due to application constructor failure, false otherwise.</returns>
-    private static bool IsApplicationConstructorError<TApplication>(Exception ex)
-    {
-        // Check if the stack trace contains the application type constructor
-        var applicationTypeName = typeof(TApplication).Name;
-        var exceptionString = ex.ToString();
-
-        // Look for patterns that indicate application constructor failure
-        if (exceptionString.Contains($"at {typeof(TApplication).FullName}..ctor(") ||
-            exceptionString.Contains($"at {applicationTypeName}..ctor("))
-        {
-            return true;
-        }
-
-        // Check inner exceptions recursively
-        var innerEx = ex.InnerException;
-        while (innerEx != null)
-        {
-            var innerString = innerEx.ToString();
-            if (innerString.Contains($"at {typeof(TApplication).FullName}..ctor(") ||
-                innerString.Contains($"at {applicationTypeName}..ctor("))
-            {
-                return true;
-            }
-
-            innerEx = innerEx.InnerException;
-        }
-
-        return false;
-    }
+    // The IsApplicationConstructorError<TApplication> helper was removed because it's not referenced anywhere.
 
     /// <summary>
     /// Handles errors by calling custom error handlers or providing default error logging behavior.

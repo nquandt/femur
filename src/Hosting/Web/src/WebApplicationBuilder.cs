@@ -181,7 +181,7 @@ public class WebApplicationBuilder
             if (loggerFactory != null)
             {
                 // Get the category name from FemurApplicationBuilder's discovery logic
-                var categoryName = ApplicationBuilder.GetLoggerCategoryName();
+                var categoryName = BootstrapLogger.GetLoggerCategoryName();
                 return loggerFactory.CreateLogger(categoryName);
             }
 
