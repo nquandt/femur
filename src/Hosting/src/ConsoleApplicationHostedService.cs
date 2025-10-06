@@ -44,7 +44,7 @@ internal class ConsoleApplicationHostedService<TApplication> : BackgroundService
             this._exitCode = await this._application.ExecuteAsync(stoppingToken);
             this._logger.LogInformation("Console application execution completed with exit code {exitCode}", this._exitCode);
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (stoppingToken.IsCancellationRequested)
         {
             // Application was cancelled via the stopping token (Ctrl+C, shutdown, etc.)
             // Check if the application had already set an exit code before the cancellation
@@ -53,10 +53,10 @@ internal class ConsoleApplicationHostedService<TApplication> : BackgroundService
                 this._exitCode = ExitCodes.CtrlCInterrupt; // Standard POSIX exit code for SIGINT (Ctrl+C)
             }
 
-            this._logger.LogWarning(ExitCodes.Messages.CtrlCInterrupt, this._exitCode);
+            this._logger.LogWarning(ex, ExitCodes.Messages.CtrlCInterrupt, this._exitCode);
             // Don't re-throw cancellation exceptions as they're expected during shutdown
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             // Application was cancelled by some other cancellation token
             if (this._exitCode == ExitCodes.Success)
@@ -64,7 +64,7 @@ internal class ConsoleApplicationHostedService<TApplication> : BackgroundService
                 this._exitCode = ExitCodes.CommandCancelled; // Command cancelled
             }
 
-            this._logger.LogWarning(ExitCodes.Messages.CommandCancelled, this._exitCode);
+            this._logger.LogWarning(ex, ExitCodes.Messages.CommandCancelled, this._exitCode);
             // Don't re-throw cancellation exceptions
         }
         catch (Exception ex)
