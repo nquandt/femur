@@ -1,0 +1,67 @@
+<Solution>
+  <Folder Name="/src/src/">
+    <Project Path="src/src/Femur.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Serialization/src/">
+    <Project Path="src/Serialization/src/Femur.Serialization.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Serialization/tests/">
+    <Project Path="src/Serialization/tests/Femur.Serialization.Tests.csproj" />
+  </Folder>
+
+  <Folder Name="/src/FileSystem/src/">
+    <Project Path="src/FileSystem/src/Femur.FileSystem.csproj" />
+  </Folder>
+
+  <Folder Name="/src/FileSystem/tests/">
+    <Project Path="src/FileSystem/tests/Femur.FileSystem.Tests.csproj" />
+  </Folder>
+
+  <Folder Name="/src/FileSystem/AzureBlob/src/">
+    <Project Path="src/FileSystem/AzureBlob/src/Femur.FileSystem.AzureBlob.csproj" />
+  </Folder>
+
+  <Folder Name="/src/AspNetCore/src/">
+    <Project Path="src/AspNetCore/src/Femur.AspNetCore.csproj" />
+  </Folder>
+
+  <Folder Name="/src/AspNetCore/Endpoints/src/">
+    <Project Path="src/AspNetCore/Endpoints/src/Femur.AspNetCore.Endpoints.csproj" />
+  </Folder>
+
+  <Folder Name="/src/AspNetCore/Endpoints/example/">
+    <Project Path="src/AspNetCore/Endpoints/example/Femur.AspNetCore.Endpoints.Example.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Hosting/src/">
+    <Project Path="src/Hosting/src/Femur.Hosting.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Hosting/example/">
+    <Project Path="src/Hosting/example/Femur.Hosting.Example.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Hosting/Web/src/">
+    <Project Path="src/Hosting/Web/src/Femur.Hosting.Web.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Hosting/Web/example/">
+    <Project Path="src/Hosting/Web/example/Femur.Hosting.Web.Example.csproj" />
+  </Folder>
+
+  <Folder Name="/src/tests/">
+    <Project Path="src/tests/Femur.Tests.csproj" />
+  </Folder>
+
+  <Folder Name="/tests/Benchmark/">
+    <Project Path="tests/Benchmark/Benchmark.csproj" />
+  </Folder>
+
+  <Folder Name="/tests/Test/">
+    <Project Path="tests/Test/Test.csproj" />
+  </Folder>
+</Solution>
+
+

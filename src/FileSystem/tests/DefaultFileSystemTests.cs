@@ -13,7 +13,40 @@ public class DefaultFileSystemTests
     {
         if (Directory.Exists(_rootDirectory))
         {
-            Directory.Delete(_rootDirectory, true);
+            try
+            {
+                // Remove read-only attributes and delete recursively
+                var directoryInfo = new DirectoryInfo(_rootDirectory);
+                directoryInfo.Attributes = FileAttributes.Normal;
+                foreach (var file in directoryInfo.GetFiles("*", SearchOption.AllDirectories))
+                {
+                    file.Attributes = FileAttributes.Normal;
+                }
+                Directory.Delete(_rootDirectory, true);
+            }
+            catch (IOException)
+            {
+                // If deletion fails, try to remove individual files
+                try
+                {
+                    var directoryInfo = new DirectoryInfo(_rootDirectory);
+                    foreach (var file in directoryInfo.GetFiles("*", SearchOption.AllDirectories))
+                    {
+                        file.Attributes = FileAttributes.Normal;
+                        file.Delete();
+                    }
+                    foreach (var dir in directoryInfo.GetDirectories("*", SearchOption.AllDirectories))
+                    {
+                        dir.Attributes = FileAttributes.Normal;
+                        dir.Delete(true);
+                    }
+                    directoryInfo.Delete(true);
+                }
+                catch
+                {
+                    // If all else fails, just use the existing directory
+                }
+            }
         }
         Directory.CreateDirectory(_rootDirectory);
         _fileSystem = new DefaultFileSystem(_rootDirectory);
