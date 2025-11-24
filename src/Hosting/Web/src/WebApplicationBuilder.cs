@@ -26,13 +26,13 @@ public class WebApplicationBuilder
     /// <returns>
     /// A task that represents the asynchronous operation. The task result contains the exit code:
     /// <list type="bullet">
-    /// <item><description><see cref="Femur.Core.Hosting.ExitCodes.Success"/> - Normal successful completion</description></item>
-    /// <item><description><see cref="Femur.Core.Hosting.ExitCodes.BuilderCreationFailed"/> - Builder creation failed</description></item>
-    /// <item><description><see cref="Femur.Core.Hosting.ExitCodes.BuildFailed"/> - Application build failed</description></item>
-    /// <item><description><see cref="Femur.Core.Hosting.ExitCodes.RuntimeError"/> - General runtime error</description></item>
-    /// <item><description><see cref="Femur.Core.Hosting.ExitCodes.PreStartupError"/> - Pre-startup error (during app.RunAsync())</description></item>
-    /// <item><description><see cref="Femur.Core.Hosting.ExitCodes.PostShutdownError"/> - Post-shutdown error</description></item>
-    /// <item><description><see cref="Femur.Core.Hosting.ExitCodes.BootstrapLoggerFailed"/> - Bootstrap logger creation failed (early exit)</description></item>
+    /// <item><description><see cref="ExitCodes.Success"/> - Normal successful completion</description></item>
+    /// <item><description><see cref="ExitCodes.BuilderCreationFailed"/> - Builder creation failed</description></item>
+    /// <item><description><see cref="ExitCodes.BuildFailed"/> - Application build failed</description></item>
+    /// <item><description><see cref="ExitCodes.RuntimeError"/> - General runtime error</description></item>
+    /// <item><description><see cref="ExitCodes.PreStartupError"/> - Pre-startup error (during app.RunAsync())</description></item>
+    /// <item><description><see cref="ExitCodes.PostShutdownError"/> - Post-shutdown error</description></item>
+    /// <item><description><see cref="ExitCodes.BootstrapLoggerFailed"/> - Bootstrap logger creation failed (early exit)</description></item>
     /// </list>
     /// </returns>
     public async Task<int> RunAsync()
@@ -83,7 +83,7 @@ public class WebApplicationBuilder
             }
 
             // Configure logging in the application container using the same configuration as bootstrap
-            webBuilder.Logging.ClearProviders();
+            _ = webBuilder.Logging.ClearProviders();
             this._consoleBuilder.BootstrapLoggingConfig(webBuilder.Logging);
 
             bootstrapLogger.LogInformation("Building web application");

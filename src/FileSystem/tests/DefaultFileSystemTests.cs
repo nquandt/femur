@@ -48,7 +48,7 @@ public class DefaultFileSystemTests
                 }
             }
         }
-        Directory.CreateDirectory(_rootDirectory);
+        _ = Directory.CreateDirectory(_rootDirectory);
         _fileSystem = new DefaultFileSystem(_rootDirectory);
     }
 
@@ -63,7 +63,7 @@ public class DefaultFileSystemTests
         using var readStream = await _fileSystem.OpenReadAsync(filePath);
         using var reader = new StreamReader(readStream);
         string content = await reader.ReadToEndAsync();
-        
+
         Assert.Equal("Hello Standard FS", content);
     }
 
@@ -72,10 +72,10 @@ public class DefaultFileSystemTests
     {
         string filePath = "exists.txt";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes("data"));
-        
+
         await _fileSystem.WriteAsync(filePath, stream);
         bool exists = await _fileSystem.FileExistsAsync(filePath);
-        
+
         Assert.True(exists);
     }
 

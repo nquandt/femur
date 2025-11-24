@@ -3,11 +3,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Femur.Hosting;
 
-interface IConsoleApplicationHostedService
-{
-    int ExitCode { get; }
-}
-
 
 /// <summary>
 /// A hosted service wrapper that executes an IConsoleApplication and manages the application lifetime.
@@ -42,7 +37,7 @@ internal class ConsoleApplicationHostedService<TApplication> : BackgroundService
         {
             this._logger.LogInformation("Starting console application execution");
             this._exitCode = await this._application.ExecuteAsync(stoppingToken);
-            this._logger.LogInformation("Console application execution completed with exit code {exitCode}", this._exitCode);
+            this._logger.LogInformation("Console application execution completed with exit code {ExitCode}", this._exitCode);
         }
         catch (OperationCanceledException ex) when (stoppingToken.IsCancellationRequested)
         {

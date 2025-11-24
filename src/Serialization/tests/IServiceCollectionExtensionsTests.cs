@@ -1,6 +1,5 @@
 // ```test/Serialization.Tests/IServiceCollectionExtensionsTests.cs
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace Femur.Serialization.Tests
 {
@@ -13,7 +12,7 @@ namespace Femur.Serialization.Tests
             var services = new ServiceCollection();
 
             // Act
-            services.AddDefaultJsonSerializer();
+            _ = services.AddDefaultJsonSerializer();
             var serviceProvider = services.BuildServiceProvider();
 
             // Assert

@@ -146,9 +146,9 @@ public static class ExitCodes
         /// <summary>
         /// Cancellation messages (Exit Codes: <see cref="CommandCancelled"/>, <see cref="CtrlCInterrupt"/>).
         /// </summary>
-        public const string CommandCancelled = "Console application was cancelled, exit code: {exitCode}";
-        public const string CtrlCInterrupt = "Console application was cancelled via stopping token, exit code: {exitCode}";
-        public const string ApplicationExecutionError = "An error occurred during console application execution, setting exit code to {exitCode}";
+        public const string CommandCancelled = "Console application was cancelled, exit code: {ExitCode}";
+        public const string CtrlCInterrupt = "Console application was cancelled via stopping token, exit code: {ExitCode}";
+        public const string ApplicationExecutionError = "An error occurred during console application execution, setting exit code to {ExitCode}";
     }
 
     /// <summary>

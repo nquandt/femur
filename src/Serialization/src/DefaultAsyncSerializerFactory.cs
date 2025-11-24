@@ -11,33 +11,33 @@ internal class DefaultAsyncSerializerFactory : IAsyncSerializerFactory
         {
             foreach (var contentType in serializer.ContentTypes)
             {
-                _serializers[contentType] = serializer;
+                this._serializers[contentType] = serializer;
             }
         }
     }
 
     public async Task<T?> DeserializeAsync<T>(Stream stream, string contentType, CancellationToken cancellationToken = default) where T : class
     {
-        var serializer = GetSerializerOrThrow(contentType);
+        var serializer = this.GetSerializerOrThrow(contentType);
 
         return await serializer.DeserializeAsync<T>(stream, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task SerializeAsync<T>(Stream stream, T obj, string contentType, CancellationToken cancellationToken = default) where T : class
     {
-        var serializer = GetSerializerOrThrow(contentType);
+        var serializer = this.GetSerializerOrThrow(contentType);
 
-        await serializer.SerializeAsync<T>(stream, obj, cancellationToken).ConfigureAwait(false);
+        await serializer.SerializeAsync(stream, obj, cancellationToken).ConfigureAwait(false);
     }
 
     public bool SupportsContentType(string contentType)
     {
-        return _serializers.ContainsKey(contentType);
+        return this._serializers.ContainsKey(contentType);
     }
 
     public bool TryGetSerializer(string contentType, [NotNullWhen(true)] out IAsyncSerializer? serializer)
     {
-        return _serializers.TryGetValue(contentType, out serializer);
+        return this._serializers.TryGetValue(contentType, out serializer);
     }
 
 

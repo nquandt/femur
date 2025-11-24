@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace Femur;
+namespace Femur.Options;
 
 public interface IStandardOptions<TOptions> where TOptions : class, IStandardOptions<TOptions>
 {

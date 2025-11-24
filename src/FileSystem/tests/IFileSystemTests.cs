@@ -92,7 +92,7 @@ public class IFileSystemTests
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes("content"));
         await _fileSystem.WriteAsync(filePath, stream);
 
-        await Assert.ThrowsAsync<IOException>(() => _fileSystem.DeleteDirectoryAsync(dirPath, false));
+        _ = await Assert.ThrowsAsync<IOException>(() => _fileSystem.DeleteDirectoryAsync(dirPath, false));
     }
 
     [Fact]

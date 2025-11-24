@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../../../Parsing/src/Femur.Parsing.csproj" />
+    <ProjectReference Include="../../../Markup.Abstractions/src/Femur.Markup.Abstractions.csproj" />
+    <ProjectReference Include="../../../Xml/Parser/src/Femur.Xml.Parser.csproj" />
+    <ProjectReference Include="../../../Xml/Abstractions/src/Femur.Xml.Abstractions.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <PackageId>Femur.Html.Parser</PackageId>
+    <Authors>Nicholas Quandt</Authors>
+    <Company>Quandt</Company>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <OutputType>Library</OutputType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
+
+</Project>
+

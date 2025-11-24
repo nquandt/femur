@@ -3,7 +3,7 @@
 
 #nullable enable
 
-using Femur;
+using Femur.AspNetCore.Endpoints;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing;
@@ -63,7 +63,7 @@ public class RouteHandlerEndpointRouteBuilderExtensionsTest
         }
     }
 
-    class WithTestAttribute
+    private class WithTestAttribute
     {
         [HttpMethod("ATTRIBUTE")]
         public void TestAction()
@@ -79,7 +79,7 @@ public class RouteHandlerEndpointRouteBuilderExtensionsTest
 
 
         var endpointBuilder = builder.MapEndpoint<WithTestAttribute>("/", new[] { "METHOD" }, i => i.TestAction);
-        endpointBuilder.WithMetadata(new HttpMethodMetadata(new[] { "BUILDER" }));
+        _ = endpointBuilder.WithMetadata(new HttpMethodMetadata(new[] { "BUILDER" }));
 
         var dataSource = Assert.Single(builder.DataSources);
         var endpoint = Assert.Single(dataSource.Endpoints);
@@ -1065,9 +1065,9 @@ public class RouteHandlerEndpointRouteBuilderExtensionsTest
     //     Assert.Equal(new[] { "added-from-endpoint-1", "added-from-endpoint-2", "added-from-inner-group", "added-from-outer-group" }, endpoint.Metadata.GetOrderedMetadata<string>());
     // }
 
-    class MyService { }
+    private class MyService { }
 
-    class ServiceAccessingEndpointFilter : IEndpointFilter
+    private class ServiceAccessingEndpointFilter : IEndpointFilter
     {
         private ILogger _logger;
         private EndpointFilterFactoryContext _routeHandlerContext;
@@ -1086,7 +1086,7 @@ public class RouteHandlerEndpointRouteBuilderExtensionsTest
         }
     }
 
-    class IncrementArgFilter : IEndpointFilter
+    private class IncrementArgFilter : IEndpointFilter
     {
         public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
         {
@@ -1095,12 +1095,12 @@ public class RouteHandlerEndpointRouteBuilderExtensionsTest
         }
     }
 
-    class FromRoute : Attribute, IFromRouteMetadata
+    private class FromRoute : Attribute, IFromRouteMetadata
     {
         public string? Name { get; set; }
     }
 
-    class TestConsumesAttribute : Attribute, IAcceptsMetadata
+    private class TestConsumesAttribute : Attribute, IAcceptsMetadata
     {
         public TestConsumesAttribute(Type requestType, string contentType, params string[] otherContentTypes)
         {
@@ -1125,9 +1125,9 @@ public class RouteHandlerEndpointRouteBuilderExtensionsTest
 
         bool IAcceptsMetadata.IsOptional => false;
 
-        Type? _requestType;
+        private Type? _requestType;
 
-        List<string> _contentTypes = new();
+        private List<string> _contentTypes = new();
     }
 
     public class Todo
@@ -1186,7 +1186,7 @@ public class RouteHandlerEndpointRouteBuilderExtensionsTest
 
 
 
-    class EmptyEndpoint
+    private class EmptyEndpoint
     {
         public void Handle()
         {
@@ -1213,7 +1213,7 @@ public class RouteHandlerEndpointRouteBuilderExtensionsTest
         }
     }
 
-    class TodoServiceEndpoint
+    private class TodoServiceEndpoint
     {
         public void Handle(TodoService todoService)
         {
@@ -1221,7 +1221,7 @@ public class RouteHandlerEndpointRouteBuilderExtensionsTest
         }
     }
 
-    class TodoEndpointWithAttribute
+    private class TodoEndpointWithAttribute
     {
         public void Handle([TestFromService] TodoService todoService)
         {

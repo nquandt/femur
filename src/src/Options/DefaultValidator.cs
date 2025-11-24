@@ -1,8 +1,8 @@
 using FluentValidation;
 
-namespace Femur;
+namespace Femur.Options;
 
-internal class DefaultValidator<TOptions> : AbstractValidator<TOptions>
+internal sealed class DefaultValidator<TOptions> : AbstractValidator<TOptions>
     where TOptions : class, IStandardOptions<TOptions>
 {
     public DefaultValidator(Action<AbstractValidator<TOptions>> setup)

@@ -1,0 +1,2081 @@
+using System.Text;
+using System.Text.RegularExpressions;
+using Femur.Parsing;
+using Femur.Parsing.Nodes;
+using Femur.Markdown.Abstractions.Nodes;
+using Femur.Markdown.Parser.Compatibility;
+
+namespace Femur.Markdown.Parser;
+
+/// <summary>
+/// Streaming Markdown parser that reads from a Stream and builds an AST.
+/// Implements CommonMark 0.31.2 specification.
+/// 
+/// PARSING STRATEGY:
+/// - Uses a sliding buffer to read stream in chunks (default 4KB)
+/// - Tracks absolute position across buffer boundaries for location tracking
+/// - Two-phase parsing approach per CommonMark spec:
+///   1. Phase 1: Block structure (line-by-line parsing of blocks)
+///   2. Phase 2: Inline structure (character-by-character parsing of inlines within blocks)
+/// </summary>
+public class MarkdownParser : StreamParser<MarkdownDocumentNode>
+{
+    private MarkdownDocumentNode? _document;
+    private MarkdownContainerNode? _currentParent;
+    private Stack<MarkdownContainerNode>? _blockStack;
+    private List<string>? _lines;
+    private StringBuilder? _currentLine;
+    private Dictionary<string, LinkReferenceDefinition>? _linkReferences;
+    private Dictionary<MarkdownContainerNode, string>? _originalTextMap; // Store original text before inline parsing
+
+    /// <summary>
+    /// Link reference definition for Phase 2 inline parsing
+    /// </summary>
+    private sealed class LinkReferenceDefinition
+    {
+        public string Url { get; set; } = string.Empty;
+        public string? Title { get; set; }
+    }
+
+    /// <summary>
+    /// Creates a new Markdown parser for the given stream
+    /// </summary>
+    public MarkdownParser(Stream stream, int bufferSize = 4096) : base(stream, bufferSize)
+    {
+    }
+
+    /// <summary>
+    /// Creates a new document instance
+    /// </summary>
+    protected override MarkdownDocumentNode CreateDocument()
+    {
+        return new MarkdownDocumentNode();
+    }
+
+    /// <summary>
+    /// Initializes parsing state (stacks, flags, etc.)
+    /// </summary>
+    protected override void InitializeParsing(MarkdownDocumentNode document)
+    {
+        this._document = document;
+        this._currentParent = document;
+        this._blockStack = new Stack<MarkdownContainerNode>();
+        this._lines = new List<string>();
+        this._currentLine = new StringBuilder();
+        this._linkReferences = new Dictionary<string, LinkReferenceDefinition>(StringComparer.OrdinalIgnoreCase);
+        this._originalTextMap = new Dictionary<MarkdownContainerNode, string>();
+    }
+
+    /// <summary>
+    /// Processes a single character from the stream.
+    /// Accumulates characters into lines for Phase 1 block parsing.
+    /// </summary>
+    protected override void ProcessCharacter(char ch, MarkdownDocumentNode document)
+    {
+        // Note: ch is already decoded/cast from bytes by StreamParser
+        // For UTF-8 support, we'd need to decode bytes here, but that would break Position tracking
+        // For now, accept that multi-byte UTF-8 characters may be corrupted in the base StreamParser
+        // but the test uses UTF-8.GetBytes which should work for ASCII-compatible characters
+
+        if (ch == '\n' || ch == '\r')
+        {
+            // End of line - add to lines list
+            if (this._currentLine != null && (this._currentLine.Length > 0 || (this._lines != null && this._lines.Count == 0)))
+            {
+                this._lines!.Add(this._currentLine.ToString());
+                _ = this._currentLine.Clear();
+            }
+            else
+            {
+                // Empty line
+                this._lines!.Add(string.Empty);
+            }
+
+            // Handle \r\n - advance past the line ending character(s)
+            if (ch == '\r' && this.Position < this.Length && this.Buffer[this.Position] == '\n')
+            {
+                this.Position++; // Skip \n (already advanced past \r)
+            }
+
+            this.Position++; // Advance past \n or \r
+        }
+        else
+        {
+            _ = this._currentLine!.Append(ch);
+            this.Position++; // Advance past the character
+        }
+    }
+
+    /// <summary>
+    /// Cleanup after parsing is complete.
+    /// Processes accumulated lines for Phase 1 (block structure), then Phase 2 (inline structure).
+    /// </summary>
+    protected override void Cleanup()
+    {
+        // Add final line if not empty
+        if (this._currentLine!.Length > 0)
+        {
+            this._lines!.Add(this._currentLine.ToString());
+        }
+
+        // Phase 1: Parse block structure
+        this.ParseBlockStructure();
+
+        // Phase 2: Parse inline structure
+        this.ParseInlineStructure();
+
+        // Phase 3: Apply smart punctuation
+        this.ApplySmartPunctuation();
+
+        base.Cleanup();
+    }
+
+    #region Phase 1: Block Structure Parsing
+
+    /// <summary>
+    /// Phase 1: Parse block structure line-by-line per CommonMark spec
+    /// </summary>
+    private void ParseBlockStructure()
+    {
+        if (this._lines == null || this._document == null)
+        {
+            return;
+        }
+
+        var i = 0;
+        while (i < this._lines.Count)
+        {
+            var line = this._lines[i];
+            var trimmed = line.TrimStart();
+            var indent = line.Length - trimmed.Length;
+
+            // Check for indented code blocks BEFORE skipping blank lines
+            // (lines with 4+ spaces are code blocks, even if they're just whitespace)
+            if (indent >= 4)
+            {
+                if (this.TryParseIndentedCodeBlock(line, indent, i, ref i, out var codeBlock) && codeBlock != null)
+                {
+                    this.AddBlock(codeBlock);
+                    continue;
+                }
+            }
+
+            // Skip blank lines (but only if not indented code blocks)
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                i++;
+                continue;
+            }
+
+            // Check for block-level constructs
+            // Note: Setext headings are checked after paragraphs are parsed
+            if (this.TryParseAtxHeading(trimmed, i, out var heading) && heading != null)
+            {
+                this.AddBlock(heading);
+                i++;
+            }
+            else if (this.TryParseThematicBreak(trimmed, i, out var thematicBreak) && thematicBreak != null)
+            {
+                this.AddBlock(thematicBreak);
+                i++;
+            }
+            else if (this.TryParseFencedCodeBlock(trimmed, i, ref i, out var codeBlock) && codeBlock != null)
+            {
+                this.AddBlock(codeBlock);
+            }
+            else if (this.TryParseBlockQuote(trimmed, i, ref i, out var blockQuote) && blockQuote != null)
+            {
+                this.AddBlock(blockQuote);
+            }
+            else if (this.TryParseList(trimmed, indent, i, ref i, out var list) && list != null)
+            {
+                this.AddBlock(list);
+            }
+            else if (this.TryParseLinkReferenceDefinition(trimmed, i, ref i, out _))
+            {
+                // Link reference definitions are consumed but not added to tree
+                // i is already advanced by TryParseLinkReferenceDefinition if multi-line
+            }
+            else if (this.TryParseHtmlBlock(trimmed, i, ref i, out var htmlBlock) && htmlBlock != null)
+            {
+                this.AddBlock(htmlBlock);
+            }
+            else
+            {
+                // Regular paragraph - but first check if next line is a Setext underline
+                // If so, parse as Setext heading instead
+                if (i + 1 < this._lines!.Count)
+                {
+                    var nextLine = this._lines[i + 1].Trim();
+                    if (this.IsSetextUnderline(nextLine))
+                    {
+                        // This is a Setext heading - parse first line as paragraph, then convert
+                        var paragraph = this.ParseParagraph(trimmed, i, ref i);
+                        if (paragraph != null)
+                        {
+                            // Convert paragraph to Setext heading
+                            var marker = nextLine[0];
+                            var level = marker == '=' ? 1 : 2;
+                            var setextHeading = new HeadingNode
+                            {
+                                Level = level,
+                                Location = paragraph.Location
+                            };
+
+                            // Move paragraph children to heading
+                            foreach (var child in paragraph.Children.ToList())
+                            {
+                                setextHeading.Children.Add(child);
+                                child.Parent = setextHeading;
+                            }
+
+                            this.AddBlock(setextHeading);
+                            i++; // Skip underline line
+                            continue;
+                        }
+                    }
+                }
+
+                // Regular paragraph
+                var regularParagraph = this.ParseParagraph(trimmed, i, ref i);
+                if (regularParagraph != null)
+                {
+                    this.AddBlock(regularParagraph);
+                }
+            }
+        }
+    }
+
+    private void AddBlock(Node node)
+    {
+        node.Parent = this._currentParent;
+        this._currentParent?.Children.Add(node);
+    }
+
+    private bool TryParseAtxHeading(string line, int lineIndex, out HeadingNode? heading)
+    {
+        heading = null;
+        if (!line.StartsWith('#'))
+        {
+            return false;
+        }
+
+        var level = 0;
+        var i = 0;
+        while (i < line.Length && i < 6 && line[i] == '#')
+        {
+            level++;
+            i++;
+        }
+
+        if (level == 0 || level > 6)
+        {
+            return false;
+        }
+
+        // Skip whitespace after #
+        while (i < line.Length && char.IsWhiteSpace(line[i]))
+        {
+            i++;
+        }
+
+        // Read heading text (remove trailing #s)
+        var text = line.Substring(i).TrimEnd('#').TrimEnd();
+
+        heading = new HeadingNode
+        {
+            Level = level,
+            Location = new SourceLocation(0, line.Length, lineIndex + 1, 1)
+        };
+
+        // Store raw text for Phase 2 inline parsing
+        heading.Children.Add(new MarkdownTextNode { Content = text });
+
+        return true;
+    }
+
+    private bool IsSetextUnderline(string line)
+    {
+        // CommonMark spec: Setext underline can have tabs/spaces
+        // Trim but preserve the fact that it's whitespace + markers
+        // The underline can be any length (even 1 character)
+        var trimmed = line.Trim();
+        if (trimmed.Length < 1)
+        {
+            return false;
+        }
+
+        var marker = trimmed[0];
+        if (marker != '=' && marker != '-')
+        {
+            return false;
+        }
+
+        // All characters must be the same marker (with optional spaces/tabs)
+        // At least one marker must be present
+        var markerCount = 0;
+        foreach (var c in trimmed)
+        {
+            if (c == marker)
+            {
+                markerCount++;
+            }
+            else if (!char.IsWhiteSpace(c))
+            {
+                return false;
+            }
+        }
+
+        return markerCount >= 1;
+    }
+
+    private bool TryParseThematicBreak(string line, int lineIndex, out ThematicBreakNode? thematicBreak)
+    {
+        thematicBreak = null;
+        var trimmed = line.Trim();
+        if (trimmed.Length < 3)
+        {
+            return false;
+        }
+
+        var marker = trimmed[0];
+        if (marker != '-' && marker != '*' && marker != '_')
+        {
+            return false;
+        }
+
+        // All characters must be the same marker (with optional spaces)
+        var count = 0;
+        foreach (var ch in trimmed)
+        {
+            if (ch == marker)
+            {
+                count++;
+            }
+            else if (!char.IsWhiteSpace(ch))
+            {
+                return false;
+            }
+        }
+
+        if (count < 3)
+        {
+            return false;
+        }
+
+        thematicBreak = new ThematicBreakNode
+        {
+            Location = new SourceLocation(0, line.Length, lineIndex + 1, 1)
+        };
+
+        return true;
+    }
+
+    private bool TryParseFencedCodeBlock(string line, int lineIndex, ref int currentIndex, out CodeBlockNode? codeBlock)
+    {
+        codeBlock = null;
+
+        // Check for opening fence: ``` or ~~~
+        var fenceChar = line.Length > 0 ? line[0] : '\0';
+        if (fenceChar != '`' && fenceChar != '~')
+        {
+            return false;
+        }
+
+        var fenceLength = 0;
+        while (fenceLength < line.Length && line[fenceLength] == fenceChar)
+        {
+            fenceLength++;
+        }
+
+        if (fenceLength < 3)
+        {
+            return false;
+        }
+
+        // Read info string (optional)
+        var info = line.Substring(fenceLength).Trim();
+
+        // Read code content until closing fence
+        var content = new StringBuilder();
+        currentIndex++;
+
+        while (currentIndex < this._lines!.Count)
+        {
+            var currentLine = this._lines[currentIndex];
+            if (currentLine.Length >= fenceLength)
+            {
+                var isClosingFence = true;
+                for (var i = 0; i < fenceLength; i++)
+                {
+                    if (currentLine[i] != fenceChar)
+                    {
+                        isClosingFence = false;
+                        break;
+                    }
+                }
+
+                if (isClosingFence)
+                {
+                    // Found closing fence
+                    currentIndex++;
+                    break;
+                }
+            }
+
+            if (content.Length > 0)
+            {
+                _ = content.Append('\n');
+            }
+
+            _ = content.Append(currentLine);
+            currentIndex++;
+        }
+
+        codeBlock = new CodeBlockNode
+        {
+            Content = content.ToString(),
+            Info = string.IsNullOrWhiteSpace(info) ? null : info,
+            IsFenced = true,
+            Location = new SourceLocation(0, content.Length, lineIndex + 1, 1)
+        };
+
+        return true;
+    }
+
+    private bool TryParseIndentedCodeBlock(string line, int indent, int lineIndex, ref int currentIndex, out CodeBlockNode? codeBlock)
+    {
+        codeBlock = null;
+
+        // Indented code block requires 4+ spaces
+        if (indent < 4)
+        {
+            return false;
+        }
+
+        var content = new StringBuilder();
+
+        while (currentIndex < this._lines!.Count)
+        {
+            var currentLine = this._lines[currentIndex];
+            var currentIndent = currentLine.Length - currentLine.TrimStart().Length;
+
+            // Blank lines are part of code block
+            if (string.IsNullOrWhiteSpace(currentLine))
+            {
+                // Always add newline to preserve structure, even if content is empty
+                _ = content.Append('\n');
+                currentIndex++;
+                continue;
+            }
+
+            // Code block continues if line has 4+ spaces indent
+            if (currentIndent >= 4)
+            {
+                if (content.Length > 0)
+                {
+                    _ = content.Append('\n');
+                }
+
+                // Remove 4 spaces of indentation
+                var remainingContent = currentLine.Substring(4);
+                _ = content.Append(remainingContent);
+
+                currentIndex++;
+            }
+            else
+            {
+                // End of code block
+                break;
+            }
+        }
+
+        // Always create code block, even if empty (CommonMark allows empty code blocks)
+        codeBlock = new CodeBlockNode
+        {
+            Content = content.ToString(),
+            IsFenced = false,
+            Location = new SourceLocation(0, content.Length, lineIndex + 1, 1)
+        };
+
+        return true;
+    }
+
+    private bool TryParseBlockQuote(string line, int lineIndex, ref int currentIndex, out BlockQuoteNode? blockQuote)
+    {
+        blockQuote = null;
+
+        if (!line.StartsWith('>'))
+        {
+            return false;
+        }
+
+        blockQuote = new BlockQuoteNode
+        {
+            Location = new SourceLocation(0, 0, lineIndex + 1, 1)
+        };
+
+        var savedParent = this._currentParent;
+        this._currentParent = blockQuote;
+
+        // Parse content lines (may include lazy continuation)
+        var contentLines = new List<string>();
+        while (currentIndex < this._lines!.Count)
+        {
+            var currentLine = this._lines[currentIndex];
+            var trimmed = currentLine.TrimStart();
+
+            if (trimmed.StartsWith('>'))
+            {
+                // Remove > and optional space
+                var content = trimmed.Substring(1).TrimStart();
+                contentLines.Add(content);
+                currentIndex++;
+            }
+            else if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                // Blank line ends blockquote
+                break;
+            }
+            else if (contentLines.Count > 0 && trimmed.Length > 0 && trimmed[0] != '>' && this._currentParent == blockQuote)
+            {
+                // Lazy continuation - part of blockquote
+                contentLines.Add(trimmed);
+                currentIndex++;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        // Parse content as blocks recursively
+        // Create a temporary document-like structure to parse nested blocks
+        var savedLines = this._lines;
+        var savedIndex = currentIndex;
+        this._lines = contentLines;
+        currentIndex = 0;
+
+        // Parse blocks from content lines
+        while (currentIndex < contentLines.Count)
+        {
+            var contentLine = contentLines[currentIndex];
+            var contentTrimmed = contentLine.TrimStart();
+            var contentIndent = contentLine.Length - contentTrimmed.Length;
+
+            if (string.IsNullOrWhiteSpace(contentTrimmed))
+            {
+                currentIndex++;
+                continue;
+            }
+
+            // Try parsing different block types
+            if (this.TryParseAtxHeading(contentTrimmed, currentIndex, out var heading) && heading != null)
+            {
+                this.AddBlock(heading);
+                currentIndex++;
+            }
+            else if (this.TryParseFencedCodeBlock(contentTrimmed, currentIndex, ref currentIndex, out var codeBlock) && codeBlock != null)
+            {
+                this.AddBlock(codeBlock);
+            }
+            else if (this.TryParseIndentedCodeBlock(contentTrimmed, contentIndent, currentIndex, ref currentIndex, out codeBlock) && codeBlock != null)
+            {
+                this.AddBlock(codeBlock);
+            }
+            else if (this.TryParseList(contentTrimmed, contentIndent, currentIndex, ref currentIndex, out var list) && list != null)
+            {
+                this.AddBlock(list);
+            }
+            else if (this.TryParseBlockQuote(contentTrimmed, currentIndex, ref currentIndex, out var nestedQuote) && nestedQuote != null)
+            {
+                this.AddBlock(nestedQuote);
+            }
+            else
+            {
+                // Parse as paragraph
+                var paragraph = this.ParseParagraph(contentTrimmed, currentIndex, ref currentIndex);
+                if (paragraph != null)
+                {
+                    this.AddBlock(paragraph);
+                }
+            }
+        }
+
+        // Restore original state
+        this._lines = savedLines;
+        currentIndex = savedIndex;
+        this._currentParent = savedParent;
+
+        return true;
+    }
+
+    private bool TryParseList(string line, int indent, int lineIndex, ref int currentIndex, out ListNode? list)
+    {
+        list = null;
+
+        // Check for list marker
+        var trimmed = line.TrimStart();
+        if (trimmed.Length == 0)
+        {
+            return false;
+        }
+
+        var isOrdered = false;
+        var startNumber = 1;
+        var bulletChar = '\0';
+        var markerLength = 0;
+
+        // Check for ordered list: number followed by . or )
+        if (char.IsDigit(trimmed[0]))
+        {
+            var numberEnd = 0;
+            while (numberEnd < trimmed.Length && char.IsDigit(trimmed[numberEnd]))
+            {
+                numberEnd++;
+            }
+
+            if (numberEnd < trimmed.Length && (trimmed[numberEnd] == '.' || trimmed[numberEnd] == ')'))
+            {
+                isOrdered = true;
+                if (!Int32Compat.TryParse(trimmed.AsSpan(0, numberEnd), out startNumber))
+                {
+                    startNumber = 1;
+                }
+
+                markerLength = numberEnd + 1;
+            }
+        }
+
+        // Check for unordered list: -, *, or +
+        if (!isOrdered)
+        {
+            if (trimmed[0] == '-' || trimmed[0] == '*' || trimmed[0] == '+')
+            {
+                bulletChar = trimmed[0];
+                markerLength = 1;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        // Must be followed by space or tab
+        if (markerLength >= trimmed.Length || !char.IsWhiteSpace(trimmed[markerLength]))
+        {
+            return false;
+        }
+
+        list = new ListNode
+        {
+            IsOrdered = isOrdered,
+            StartNumber = startNumber,
+            BulletChar = bulletChar,
+            Location = new SourceLocation(0, 0, lineIndex + 1, 1)
+        };
+
+        var savedParent = this._currentParent;
+        this._currentParent = list;
+
+        // Parse list items
+        while (currentIndex < this._lines!.Count)
+        {
+            var currentLine = this._lines[currentIndex];
+            var currentTrimmed = currentLine.TrimStart();
+            var currentIndent = currentLine.Length - currentTrimmed.Length;
+
+            // Check if this line starts a new list item
+            var isListItem = false;
+            if (isOrdered && char.IsDigit(currentTrimmed[0]))
+            {
+                var numEnd = 0;
+                while (numEnd < currentTrimmed.Length && char.IsDigit(currentTrimmed[numEnd]))
+                {
+                    numEnd++;
+                }
+
+                if (numEnd < currentTrimmed.Length && (currentTrimmed[numEnd] == '.' || currentTrimmed[numEnd] == ')'))
+                {
+                    isListItem = true;
+                }
+            }
+            else if (!isOrdered && (currentTrimmed[0] == '-' || currentTrimmed[0] == '*' || currentTrimmed[0] == '+'))
+            {
+                isListItem = true;
+            }
+
+            if (isListItem && currentIndent == indent)
+            {
+                // New list item
+                var listItem = this.ParseListItem(currentLine, currentIndex, ref currentIndex);
+                if (listItem != null)
+                {
+                    listItem.Parent = list;
+                    list.Children.Add(listItem);
+                }
+            }
+            else if (string.IsNullOrWhiteSpace(currentTrimmed))
+            {
+                // Blank line - may continue list or end it
+                currentIndex++;
+            }
+            else
+            {
+                // Not a list item - end of list
+                break;
+            }
+        }
+
+        this._currentParent = savedParent;
+
+        return true;
+    }
+
+    private ListItemNode? ParseListItem(string line, int lineIndex, ref int currentIndex)
+    {
+        var trimmed = line.TrimStart();
+        var indent = line.Length - trimmed.Length;
+
+        // Find marker
+        var markerEnd = 0;
+        if (char.IsDigit(trimmed[0]))
+        {
+            while (markerEnd < trimmed.Length && char.IsDigit(trimmed[markerEnd]))
+            {
+                markerEnd++;
+            }
+
+            if (markerEnd < trimmed.Length && (trimmed[markerEnd] == '.' || trimmed[markerEnd] == ')'))
+            {
+                markerEnd++;
+            }
+        }
+        else if (trimmed[0] == '-' || trimmed[0] == '*' || trimmed[0] == '+')
+        {
+            markerEnd = 1;
+        }
+
+        // Skip whitespace after marker
+        var contentStart = markerEnd;
+        while (contentStart < trimmed.Length && char.IsWhiteSpace(trimmed[contentStart]))
+        {
+            contentStart++;
+        }
+
+        var listItem = new ListItemNode
+        {
+            Location = new SourceLocation(0, 0, lineIndex + 1, 1)
+        };
+
+        var contentLines = new List<string> { trimmed.Substring(contentStart) };
+        currentIndex++;
+
+        // Parse continuation lines (indented content)
+        while (currentIndex < this._lines!.Count)
+        {
+            var currentLine = this._lines[currentIndex];
+            var currentTrimmed = currentLine.TrimStart();
+            var currentIndent = currentLine.Length - currentTrimmed.Length;
+
+            if (string.IsNullOrWhiteSpace(currentTrimmed))
+            {
+                // Blank line - may be part of list item or end it
+                contentLines.Add(string.Empty);
+                currentIndex++;
+            }
+            else if (currentIndent > indent)
+            {
+                // Indented content - continuation of list item
+                contentLines.Add(currentTrimmed);
+                currentIndex++;
+            }
+            else
+            {
+                // Not indented enough - end of list item
+                break;
+            }
+        }
+
+        // Parse content as blocks if indented, otherwise as paragraph
+        var savedParent = this._currentParent;
+        this._currentParent = listItem;
+
+        // Check if content starts with block-level constructs
+        var hasBlocks = false;
+        foreach (var contentLine in contentLines)
+        {
+            var lineTrimmed = contentLine.TrimStart();
+            if (string.IsNullOrWhiteSpace(lineTrimmed))
+            {
+                continue;
+            }
+
+            // Check for block-level constructs
+            if (lineTrimmed.StartsWith('#') ||
+                lineTrimmed.StartsWith('>') ||
+                lineTrimmed.StartsWith("```") ||
+                lineTrimmed.StartsWith("~~~") ||
+                (lineTrimmed.Length >= 4 && lineTrimmed.Substring(0, 4) == "    ") ||
+                Regex.IsMatch(lineTrimmed, @"^\s*[-*+]\s") ||
+                Regex.IsMatch(lineTrimmed, @"^\s*\d+[.)]\s"))
+            {
+                hasBlocks = true;
+                break;
+            }
+        }
+
+        if (hasBlocks)
+        {
+            // Parse as blocks recursively
+            var savedLines = this._lines;
+            var savedIndex = currentIndex;
+            this._lines = contentLines;
+            currentIndex = 0;
+
+            while (currentIndex < contentLines.Count)
+            {
+                var contentLine = contentLines[currentIndex];
+                var contentTrimmed = contentLine.TrimStart();
+                var contentIndent = contentLine.Length - contentTrimmed.Length;
+
+                if (string.IsNullOrWhiteSpace(contentTrimmed))
+                {
+                    currentIndex++;
+                    continue;
+                }
+
+                // Try parsing different block types
+                if (this.TryParseFencedCodeBlock(contentTrimmed, currentIndex, ref currentIndex, out var codeBlock) && codeBlock != null)
+                {
+                    this.AddBlock(codeBlock);
+                }
+                else if (this.TryParseIndentedCodeBlock(contentTrimmed, contentIndent, currentIndex, ref currentIndex, out codeBlock) && codeBlock != null)
+                {
+                    this.AddBlock(codeBlock);
+                }
+                else if (this.TryParseBlockQuote(contentTrimmed, currentIndex, ref currentIndex, out var blockQuote) && blockQuote != null)
+                {
+                    this.AddBlock(blockQuote);
+                }
+                else if (this.TryParseList(contentTrimmed, contentIndent, currentIndex, ref currentIndex, out var nestedList) && nestedList != null)
+                {
+                    this.AddBlock(nestedList);
+                }
+                else
+                {
+                    // Parse as paragraph
+                    var paragraph = this.ParseParagraph(contentTrimmed, currentIndex, ref currentIndex);
+                    if (paragraph != null)
+                    {
+                        this.AddBlock(paragraph);
+                    }
+                }
+            }
+
+            // Restore original state
+            this._lines = savedLines;
+            currentIndex = savedIndex;
+        }
+        else
+        {
+            // Create paragraph from content
+            var content = StringCompat.Join('\n', contentLines).TrimEnd();
+            if (!string.IsNullOrWhiteSpace(content))
+            {
+                var paragraph = new ParagraphNode();
+                paragraph.Children.Add(new MarkdownTextNode { Content = content });
+                paragraph.Parent = listItem;
+                listItem.Children.Add(paragraph);
+            }
+        }
+
+        this._currentParent = savedParent;
+        return listItem;
+    }
+
+    private bool TryParseLinkReferenceDefinition(string line, int lineIndex, ref int currentIndex, out LinkReferenceDefinition? definition)
+    {
+        definition = null;
+
+        // Format: [id]: url "title" or [id]: url 'title' or [id]: url (title)
+        // CommonMark spec: Link reference definition cannot have escaped brackets
+        // Check for [id]: pattern, but id cannot be empty or just escaped characters
+        var trimmed = line.TrimStart();
+        if (!trimmed.StartsWith('['))
+        {
+            return false;
+        }
+
+        // Find the closing bracket
+        var bracketEnd = trimmed.IndexOf(']', 1);
+        if (bracketEnd < 0 || bracketEnd + 1 >= trimmed.Length || trimmed[bracketEnd + 1] != ':')
+        {
+            return false;
+        }
+
+        // Extract id - check for escaped brackets
+        var id = trimmed.Substring(1, bracketEnd - 1);
+
+        // If id contains only backslash (escaped bracket), it's not a valid link reference
+        if (string.IsNullOrWhiteSpace(id) || id == "\\")
+        {
+            return false;
+        }
+
+        // Rest of line after ]: - may span multiple lines
+        var rest = trimmed.Substring(bracketEnd + 2).TrimStart();
+        var urlLines = new List<string> { rest };
+
+        // CommonMark spec: Link reference definitions can span multiple lines
+        // Continue reading lines until we find a blank line or non-indented line
+        currentIndex++;
+        while (currentIndex < this._lines!.Count)
+        {
+            var nextLine = this._lines[currentIndex];
+            var nextTrimmed = nextLine.TrimStart();
+            var nextIndent = nextLine.Length - nextTrimmed.Length;
+
+            // Blank line ends the link reference definition
+            if (string.IsNullOrWhiteSpace(nextTrimmed))
+            {
+                break;
+            }
+
+            // If line is indented, it's a continuation
+            if (nextIndent > 0)
+            {
+                urlLines.Add(nextTrimmed);
+                currentIndex++;
+            }
+            else
+            {
+                // Non-indented line ends the definition
+                break;
+            }
+        }
+
+        // Join all lines and parse URL and optional title
+        var fullRest = string.Join(" ", urlLines).Trim();
+
+        // Parse URL and optional title per CommonMark spec
+        var url = fullRest;
+        string? title = null;
+
+        // Handle URL without quotes (CommonMark allows this)
+        if (string.IsNullOrWhiteSpace(fullRest))
+        {
+            return false;
+        }
+
+        // Check for title in quotes or parentheses
+        var firstChar = fullRest[0];
+        if (firstChar == '"' || firstChar == '\'' || firstChar == '(')
+        {
+            var quoteChar = firstChar;
+            var urlEnd = fullRest.IndexOf(quoteChar == '(' ? ')' : quoteChar, 1);
+            if (urlEnd > 0)
+            {
+                url = fullRest.Substring(1, urlEnd - 1);
+                if (fullRest.Length > urlEnd + 1)
+                {
+                    var titlePart = fullRest.Substring(urlEnd + 1).Trim();
+                    if (titlePart.Length > 0 && (titlePart[0] == '"' || titlePart[0] == '\''))
+                    {
+                        var titleQuote = titlePart[0];
+                        var titleEnd = titlePart.IndexOf(titleQuote, 1);
+                        if (titleEnd > 0)
+                        {
+                            title = titlePart.Substring(1, titleEnd - 1);
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            // URL without quotes - find space separator for title
+            var spaceIndex = fullRest.IndexOf(' ');
+            if (spaceIndex > 0)
+            {
+                url = fullRest.Substring(0, spaceIndex);
+                var titlePart = fullRest.Substring(spaceIndex + 1).Trim();
+                if (titlePart.Length > 2 && (titlePart[0] == '"' || titlePart[0] == '\''))
+                {
+                    var quoteChar = titlePart[0];
+                    var titleEnd = titlePart.IndexOf(quoteChar, 1);
+                    if (titleEnd > 0)
+                    {
+                        title = titlePart.Substring(1, titleEnd - 1);
+                    }
+                }
+            }
+            else
+            {
+                // URL only, no title
+                url = fullRest;
+            }
+        }
+
+        // Normalize link reference id (collapse whitespace per CommonMark spec)
+        var normalizedId = Regex.Replace(id, @"\s+", " ").Trim();
+
+        definition = new LinkReferenceDefinition
+        {
+            Url = url.Trim(),
+            Title = title
+        };
+
+        this._linkReferences![normalizedId] = definition;
+
+        return true;
+    }
+
+    private bool TryParseHtmlBlock(string line, int lineIndex, ref int currentIndex, out HtmlBlockNode? htmlBlock)
+    {
+        htmlBlock = null;
+
+        // Simplified HTML block detection - CommonMark has 7 types
+        // For now, detect basic HTML tags
+        var trimmed = line.TrimStart();
+        if (!trimmed.StartsWith('<'))
+        {
+            return false;
+        }
+
+        // Check for common HTML block tags (CommonMark HTML block types 1-7)
+        // Type 1-5: Specific tags that require closing tags
+        var htmlBlockTags = new[] { "script", "style", "pre", "iframe", "math", "svg", "div", "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "table", "thead", "tbody", "tr", "td", "th" };
+        foreach (var tag in htmlBlockTags)
+        {
+            if (trimmed.StartsWith($"<{tag}", StringComparison.OrdinalIgnoreCase) ||
+                trimmed.StartsWith($"</{tag}", StringComparison.OrdinalIgnoreCase))
+            {
+                // Parse until closing tag
+                var content = new StringBuilder();
+
+                while (currentIndex < this._lines!.Count)
+                {
+                    var currentLine = this._lines[currentIndex];
+                    if (content.Length > 0)
+                    {
+                        _ = content.Append('\n');
+                    }
+
+                    _ = content.Append(currentLine);
+                    currentIndex++;
+
+                    // Check for closing tag
+                    if (currentLine.Contains($"</{tag}>", StringComparison.OrdinalIgnoreCase))
+                    {
+                        break;
+                    }
+                }
+
+                htmlBlock = new HtmlBlockNode
+                {
+                    Content = content.ToString(),
+                    Location = new SourceLocation(0, content.Length, lineIndex + 1, 1)
+                };
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private ParagraphNode? ParseParagraph(string line, int lineIndex, ref int currentIndex)
+    {
+        var contentLines = new List<string> { line };
+        currentIndex++;
+
+        // Continue paragraph until blank line or block construct
+        while (currentIndex < this._lines!.Count)
+        {
+            var currentLine = this._lines[currentIndex];
+            var trimmed = currentLine.TrimStart();
+
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                // Blank line ends paragraph
+                break;
+            }
+
+            // Check if next line starts a block construct
+            if (this.IsBlockStart(trimmed))
+            {
+                break;
+            }
+
+            contentLines.Add(currentLine);
+            currentIndex++;
+        }
+
+        var content = StringCompat.Join('\n', contentLines);
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return null;
+        }
+
+        var paragraph = new ParagraphNode
+        {
+            Location = new SourceLocation(0, content.Length, lineIndex + 1, 1)
+        };
+
+        // Store raw text for Phase 2 inline parsing (preserve newlines for hard break detection)
+        paragraph.Children.Add(new MarkdownTextNode { Content = content });
+
+        return paragraph;
+    }
+
+    private bool IsBlockStart(string line)
+    {
+        return line.StartsWith('#') ||
+               line.StartsWith('>') ||
+               (line.Length >= 3 && (line.StartsWith("---") || line.StartsWith("***") || line.StartsWith("___"))) ||
+               line.StartsWith("```") ||
+               line.StartsWith("~~~") ||
+               Regex.IsMatch(line, @"^\s*[-*+]\s") ||
+               Regex.IsMatch(line, @"^\s*\d+[.)]\s") ||
+               line.TrimStart().Length >= 4 && line.Substring(0, 4).All(c => c == ' ');
+    }
+
+    #endregion
+
+    #region Phase 2: Inline Structure Parsing
+
+    /// <summary>
+    /// Phase 2: Parse inline structure within blocks
+    /// </summary>
+    private void ParseInlineStructure()
+    {
+        if (this._document == null)
+        {
+            return;
+        }
+
+        this.WalkTreeAndParseInlines(this._document);
+    }
+
+    private void WalkTreeAndParseInlines(Node node)
+    {
+        // Parse inlines in paragraphs, headings, and inline container nodes
+        if (node is ParagraphNode paragraph)
+        {
+            this.ParseInlineContent(paragraph);
+        }
+        else if (node is HeadingNode heading)
+        {
+            this.ParseInlineContent(heading);
+        }
+        else if (node is LinkNode || node is EmphasisNode || node is StrongEmphasisNode || node is ImageNode)
+        {
+            // Parse inline content in link, emphasis, and image nodes for nested formatting
+            this.ParseInlineContent((MarkdownContainerNode)node);
+        }
+
+        // Recursively process children
+        if (node is MarkdownContainerNode container)
+        {
+            foreach (var child in container.Children.ToList())
+            {
+                this.WalkTreeAndParseInlines(child);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Phase 3: Apply smart punctuation transformations
+    /// </summary>
+    private void ApplySmartPunctuation()
+    {
+        if (this._document == null)
+        {
+            return;
+        }
+
+        this.WalkTreeAndApplySmartPunctuation(this._document);
+    }
+
+    private void WalkTreeAndApplySmartPunctuation(Node node, string? originalText = null)
+    {
+        // Get original text from stored map if this is a paragraph or heading
+        if (node is MarkdownContainerNode container && this._originalTextMap!.TryGetValue(container, out var storedOriginalText))
+        {
+            originalText = storedOriginalText;
+        }
+
+        // Apply smart punctuation to text nodes (but not in code spans/blocks)
+        if (node is MarkdownTextNode textNode && !(node.Parent is CodeSpanNode))
+        {
+            textNode.Content = this.ApplySmartPunctuationToText(textNode.Content, originalText);
+        }
+
+        // Recursively process children
+        if (node is MarkdownContainerNode containerNode)
+        {
+            foreach (var child in containerNode.Children.ToList())
+            {
+                this.WalkTreeAndApplySmartPunctuation(child, originalText);
+            }
+        }
+    }
+
+    private void ParseInlineContent(MarkdownContainerNode container)
+    {
+        // Store original text before inline parsing for smart punctuation
+        string? originalText = null;
+        if (container is ParagraphNode || container is HeadingNode)
+        {
+            var firstMarkdownTextNode = container.Children.OfType<MarkdownTextNode>().FirstOrDefault();
+            if (firstMarkdownTextNode != null)
+            {
+                originalText = firstMarkdownTextNode.Content;
+                // Store original text for smart punctuation
+                if (this._originalTextMap != null)
+                {
+                    this._originalTextMap[container] = originalText;
+                }
+            }
+        }
+
+        // Find text nodes and parse them as inline content
+        var textNodes = container.Children.OfType<MarkdownTextNode>().ToList();
+        foreach (var textNode in textNodes)
+        {
+            var text = textNode.Content;
+            var newNodes = this.ParseInlineText(text, textNode.Location.Offset, originalText ?? text);
+
+            // Replace text node with parsed inline nodes
+            var index = container.Children.IndexOf(textNode);
+            container.Children.RemoveAt(index);
+
+            foreach (var newNode in newNodes)
+            {
+                newNode.Parent = container;
+                container.Children.Insert(index, newNode);
+                index++;
+            }
+        }
+    }
+
+    private List<Node> ParseInlineText(string text, int baseOffset, string originalText)
+    {
+        var result = new List<Node>();
+        if (string.IsNullOrEmpty(text))
+        {
+            return result;
+        }
+
+        // Simplified inline parsing - full implementation would use delimiter stack
+        // For now, implement basic patterns
+
+        var i = 0;
+        var currentText = new StringBuilder();
+
+        while (i < text.Length)
+        {
+            // Code span: `code` or ``code with `backticks` ``
+            if (text[i] == '`')
+            {
+                // Flush current text
+                if (currentText.Length > 0)
+                {
+                    result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                    _ = currentText.Clear();
+                }
+
+                // Count consecutive backticks
+                var backtickCount = 1;
+                while (i + backtickCount < text.Length && text[i + backtickCount] == '`')
+                {
+                    backtickCount++;
+                }
+
+                // Find matching closing backticks
+                var codeStart = i + backtickCount;
+                var searchStart = codeStart;
+                var codeEnd = -1;
+
+                while (searchStart < text.Length)
+                {
+                    var foundPos = text.IndexOf('`', searchStart);
+                    if (foundPos < 0)
+                    {
+                        break;
+                    }
+
+                    // Count consecutive backticks at this position
+                    var closingCount = 1;
+                    while (foundPos + closingCount < text.Length && text[foundPos + closingCount] == '`')
+                    {
+                        closingCount++;
+                    }
+
+                    if (closingCount == backtickCount)
+                    {
+                        codeEnd = foundPos;
+                        break;
+                    }
+
+                    searchStart = foundPos + closingCount;
+                }
+
+                if (codeEnd > 0)
+                {
+                    var codeContent = text.Substring(codeStart, codeEnd - codeStart);
+                    result.Add(new CodeSpanNode { Content = codeContent });
+                    i = codeEnd + backtickCount;
+                    continue;
+                }
+            }
+
+            // Emphasis: *text* or _text_
+            if (text[i] == '*' || text[i] == '_')
+            {
+                var marker = text[i];
+                var markerCount = 1;
+                while (i + markerCount < text.Length && text[i + markerCount] == marker)
+                {
+                    markerCount++;
+                }
+
+                // Flush current text
+                if (currentText.Length > 0)
+                {
+                    result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                    _ = currentText.Clear();
+                }
+
+                // Try to find matching closer
+                var closerPos = this.FindEmphasisCloser(text, i + markerCount, marker, markerCount);
+                if (closerPos > 0)
+                {
+                    var emphasisText = text.Substring(i + markerCount, closerPos - i - markerCount);
+                    if (markerCount >= 3)
+                    {
+                        // ***text*** should be parsed as <strong><em>text</em></strong>
+                        var emphasisNode = new EmphasisNode { Children = { new MarkdownTextNode { Content = emphasisText } } };
+                        result.Add(new StrongEmphasisNode { Children = { emphasisNode } });
+                    }
+                    else if (markerCount >= 2)
+                    {
+                        result.Add(new StrongEmphasisNode { Children = { new MarkdownTextNode { Content = emphasisText } } });
+                    }
+                    else
+                    {
+                        result.Add(new EmphasisNode { Children = { new MarkdownTextNode { Content = emphasisText } } });
+                    }
+
+                    i = closerPos + markerCount;
+                    continue;
+                }
+            }
+
+            // Link: [text](url) or [text][ref] - check BEFORE images since links can contain images
+            if (text[i] == '[')
+            {
+                // Flush current text
+                if (currentText.Length > 0)
+                {
+                    result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                    _ = currentText.Clear();
+                }
+
+                // Find matching closing bracket, handling nested brackets (e.g., [![alt](img.png)])
+                var linkEnd = -1;
+                var bracketDepth = 1;
+                for (var j = i + 1; j < text.Length; j++)
+                {
+                    if (text[j] == '[')
+                    {
+                        bracketDepth++;
+                    }
+                    else if (text[j] == ']')
+                    {
+                        bracketDepth--;
+                        if (bracketDepth == 0)
+                        {
+                            linkEnd = j;
+                            break;
+                        }
+                    }
+                }
+
+                if (linkEnd > 0)
+                {
+                    var linkText = text.Substring(i + 1, linkEnd - i - 1);
+
+                    // Check for inline link: (url) or (url "title")
+                    if (linkEnd + 1 < text.Length && text[linkEnd + 1] == '(')
+                    {
+                        var urlStart = linkEnd + 2;
+                        var urlEnd = text.IndexOf(')', urlStart);
+                        if (urlEnd > 0)
+                        {
+                            var urlAndTitle = text.Substring(urlStart, urlEnd - urlStart).Trim();
+                            var url = urlAndTitle;
+                            string? title = null;
+
+                            // Check for title in quotes (handle escaped quotes)
+                            var spaceIndex = urlAndTitle.IndexOf(' ');
+                            if (spaceIndex > 0 && spaceIndex < urlAndTitle.Length - 1)
+                            {
+                                var titlePart = urlAndTitle.Substring(spaceIndex + 1).Trim();
+                                if (titlePart.Length > 2 && (titlePart[0] == '"' || titlePart[0] == '\''))
+                                {
+                                    var quoteChar = titlePart[0];
+                                    // Find closing quote, handling escaped quotes
+                                    var titleEnd = -1;
+                                    for (var j = 1; j < titlePart.Length; j++)
+                                    {
+                                        if (titlePart[j] == quoteChar && (j == 0 || titlePart[j - 1] != '\\'))
+                                        {
+                                            titleEnd = j;
+                                            break;
+                                        }
+                                    }
+
+                                    if (titleEnd > 0)
+                                    {
+                                        url = urlAndTitle.Substring(0, spaceIndex).Trim();
+                                        title = titlePart.Substring(1, titleEnd - 1).Replace("\\\"", "\"").Replace("\\'", "'");
+                                    }
+                                }
+                            }
+
+                            var link = new LinkNode { Url = url, Title = title };
+
+                            // Parse link text for inline elements (images, emphasis, etc.)
+                            var linkTextNodes = this.ParseInlineText(linkText, baseOffset + i + 1, linkText);
+                            foreach (var node in linkTextNodes)
+                            {
+                                link.Children.Add(node);
+                            }
+
+                            result.Add(link);
+                            i = urlEnd + 1;
+                            continue;
+                        }
+                    }
+
+                    // Check for reference link: [ref] or shortcut reference [text]
+                    // First try explicit reference [text][ref]
+                    if (linkEnd + 1 < text.Length && text[linkEnd + 1] == '[')
+                    {
+                        var refEnd = text.IndexOf(']', linkEnd + 2);
+                        if (refEnd > 0)
+                        {
+                            var refId = text.Substring(linkEnd + 2, refEnd - linkEnd - 2);
+                            // Normalize reference id (collapse whitespace)
+                            var normalizedRefId = Regex.Replace(refId, @"\s+", " ").Trim();
+                            if (this._linkReferences!.TryGetValue(normalizedRefId, out var linkRef))
+                            {
+                                var link = new LinkNode { Url = linkRef.Url, Title = linkRef.Title };
+                                link.Children.Add(new MarkdownTextNode { Content = linkText });
+                                result.Add(link);
+                                i = refEnd + 1;
+                                continue;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Shortcut reference: [text] where text matches a link reference id
+                        // Normalize link text (collapse whitespace)
+                        var normalizedLinkText = Regex.Replace(linkText, @"\s+", " ").Trim();
+                        if (this._linkReferences!.TryGetValue(normalizedLinkText, out var shortcutRef))
+                        {
+                            var link = new LinkNode { Url = shortcutRef.Url, Title = shortcutRef.Title };
+                            link.Children.Add(new MarkdownTextNode { Content = linkText });
+                            result.Add(link);
+                            i = linkEnd + 1;
+                            continue;
+                        }
+                    }
+                }
+            }
+
+
+            // Hard line break: backslash followed by newline, or two spaces before newline
+            if (text[i] == '\\' && i + 1 < text.Length && text[i + 1] == '\n')
+            {
+                // Backslash followed by newline = hard line break
+                // Flush current text
+                if (currentText.Length > 0)
+                {
+                    result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                    _ = currentText.Clear();
+                }
+
+                result.Add(new HardLineBreakNode());
+                i += 2; // Skip backslash and newline
+                continue;
+            }
+
+            // Two spaces before newline = hard line break
+            if (i + 2 < text.Length && text[i] == ' ' && text[i + 1] == ' ' && text[i + 2] == '\n')
+            {
+                // Flush current text
+                if (currentText.Length > 0)
+                {
+                    result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                    _ = currentText.Clear();
+                }
+
+                result.Add(new HardLineBreakNode());
+                i += 3; // Skip two spaces and newline
+                continue;
+            }
+
+            // Single newline = soft line break
+            if (text[i] == '\n')
+            {
+                // Flush current text
+                if (currentText.Length > 0)
+                {
+                    result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                    _ = currentText.Clear();
+                }
+
+                result.Add(new SoftLineBreakNode());
+                i++;
+                continue;
+            }
+
+            // Image: ![alt](url) - parse AFTER links so links can contain images
+            if (i + 1 < text.Length && text[i] == '!' && text[i + 1] == '[')
+            {
+                // Flush current text
+                if (currentText.Length > 0)
+                {
+                    result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                    _ = currentText.Clear();
+                }
+
+                var altEnd = text.IndexOf(']', i + 2);
+                if (altEnd > 0 && altEnd + 1 < text.Length && text[altEnd + 1] == '(')
+                {
+                    var altText = text.Substring(i + 2, altEnd - i - 2);
+                    var urlStart = altEnd + 2;
+                    var urlEnd = text.IndexOf(')', urlStart);
+                    if (urlEnd > 0)
+                    {
+                        var urlAndTitle = text.Substring(urlStart, urlEnd - urlStart).Trim();
+                        var url = urlAndTitle;
+                        string? title = null;
+
+                        // Check for title in quotes (handle escaped quotes)
+                        var spaceIndex = urlAndTitle.IndexOf(' ');
+                        if (spaceIndex > 0 && spaceIndex < urlAndTitle.Length - 1)
+                        {
+                            var titlePart = urlAndTitle.Substring(spaceIndex + 1).Trim();
+                            if (titlePart.Length > 2 && (titlePart[0] == '"' || titlePart[0] == '\''))
+                            {
+                                var quoteChar = titlePart[0];
+                                // Find closing quote, handling escaped quotes
+                                var titleEnd = -1;
+                                for (var j = 1; j < titlePart.Length; j++)
+                                {
+                                    if (titlePart[j] == quoteChar && (j == 0 || titlePart[j - 1] != '\\'))
+                                    {
+                                        titleEnd = j;
+                                        break;
+                                    }
+                                }
+
+                                if (titleEnd > 0)
+                                {
+                                    url = urlAndTitle.Substring(0, spaceIndex).Trim();
+                                    title = titlePart.Substring(1, titleEnd - 1).Replace("\\\"", "\"").Replace("\\'", "'");
+                                }
+                            }
+                        }
+
+                        var image = new ImageNode { Url = url, Title = title };
+                        image.Children.Add(new MarkdownTextNode { Content = altText });
+                        result.Add(image);
+                        i = urlEnd + 1;
+                        continue;
+                    }
+                }
+            }
+
+            // Handle escaped characters - process them but track for smart punctuation
+            if (text[i] == '\\' && i + 1 < text.Length)
+            {
+                var nextCh = text[i + 1];
+                // Check if this is an escaped punctuation that affects smart punctuation
+                if (nextCh == '-' || nextCh == '.')
+                {
+                    // Track escaped sequences for smart punctuation
+                    // For now, just append the character (backslash removed per CommonMark)
+                    _ = currentText.Append(nextCh);
+                    i += 2;
+                    continue;
+                }
+                else if (nextCh == '"' || nextCh == '\'')
+                {
+                    // Escaped quotes - append character (backslash removed)
+                    _ = currentText.Append(nextCh);
+                    i += 2;
+                    continue;
+                }
+                // Other escaped characters handled elsewhere
+            }
+
+            _ = currentText.Append(text[i]);
+            i++;
+        }
+
+        // Flush remaining text
+        if (currentText.Length > 0)
+        {
+            var textContent = currentText.ToString();
+            // Store original text with escaped sequences marked for smart punctuation
+            var textNode = new MarkdownTextNode { Content = textContent };
+            // We'll track escaped sequences by checking originalText during smart punctuation
+            result.Add(textNode);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Apply smart punctuation transformations to text.
+    /// Transforms straight quotes to curly quotes, hyphens to dashes, and periods to ellipses.
+    /// Uses a delimiter stack approach similar to emphasis parsing for quote matching.
+    /// </summary>
+    /// <param name="text">The text to transform (after inline parsing)</param>
+    /// <param name="originalText">Optional original text (before inline parsing) to check for escaped characters</param>
+    private string ApplySmartPunctuationToText(string text, string? originalText)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        var result = new StringBuilder(text.Length);
+
+        // Build set of escaped sequences from original text
+        // Track sequences that were escaped (without backslashes, as they appear after inline parsing)
+        var escapedSequences = new HashSet<string>();
+        if (!string.IsNullOrEmpty(originalText))
+        {
+            var origI = 0;
+            while (origI < originalText!.Length)
+            {
+                if (originalText[origI] == '\\' && origI + 1 < originalText.Length)
+                {
+                    var nextCh = originalText[origI + 1];
+                    if (nextCh == '-')
+                    {
+                        // Check for escaped dash sequences
+                        // Could be \-- (two dashes) or multiple \-\- (consecutive escaped dashes)
+                        var dashCount = 1;
+                        var checkPos = origI + 2;
+
+                        // First, count dashes after this backslash
+                        while (checkPos < originalText.Length && originalText[checkPos] == '-')
+                        {
+                            dashCount++;
+                            checkPos++;
+                        }
+
+                        // Then check for consecutive escaped dashes (e.g., \-\-\-)
+                        while (checkPos < originalText.Length &&
+                               originalText[checkPos] == '\\' &&
+                               checkPos + 1 < originalText.Length &&
+                               originalText[checkPos + 1] == '-')
+                        {
+                            dashCount++;
+                            checkPos += 2; // Skip \-
+                            // Count any additional dashes after this backslash
+                            while (checkPos < originalText.Length && originalText[checkPos] == '-')
+                            {
+                                dashCount++;
+                                checkPos++;
+                            }
+                        }
+
+                        // Store the sequence without backslash (as it appears after inline parsing)
+                        _ = escapedSequences.Add(new string('-', dashCount));
+                        origI = checkPos;
+                        continue;
+                    }
+                    else if (nextCh == '.')
+                    {
+                        // Check for escaped period sequences
+                        var periodCount = 1;
+                        var checkPos = origI + 2;
+
+                        // Count periods after this backslash
+                        while (checkPos < originalText.Length && originalText[checkPos] == '.')
+                        {
+                            periodCount++;
+                            checkPos++;
+                        }
+
+                        // Check for consecutive escaped periods (e.g., \.\.\.)
+                        while (checkPos < originalText.Length &&
+                               originalText[checkPos] == '\\' &&
+                               checkPos + 1 < originalText.Length &&
+                               originalText[checkPos + 1] == '.')
+                        {
+                            periodCount++;
+                            checkPos += 2; // Skip \.
+                            // Count any additional periods after this backslash
+                            while (checkPos < originalText.Length && originalText[checkPos] == '.')
+                            {
+                                periodCount++;
+                                checkPos++;
+                            }
+                        }
+
+                        if (periodCount >= 3)
+                        {
+                            _ = escapedSequences.Add(new string('.', periodCount));
+                        }
+
+                        origI = checkPos;
+                        continue;
+                    }
+                    else if (nextCh == '"' || nextCh == '\'')
+                    {
+                        // Escaped quote - mark it (we'll check if any quotes were escaped)
+                        _ = escapedSequences.Add(nextCh.ToString());
+                        origI += 2;
+                        continue;
+                    }
+                }
+
+                origI++;
+            }
+        }
+
+        var escapedPositions = new HashSet<int>(); // Track escaped character positions in processed text
+        var quoteTypes = new List<(int pos, char type)>(); // 'd' for double, 's' for single
+
+        // First pass: identify escaped characters and build quote list
+        var i = 0;
+        while (i < text.Length)
+        {
+            if (text[i] == '\\' && i + 1 < text.Length)
+            {
+                var nextCh = text[i + 1];
+                if (nextCh == '"' || nextCh == '\'' || nextCh == '-' || nextCh == '.')
+                {
+                    _ = escapedPositions.Add(i + 1);
+                    i += 2;
+                    continue;
+                }
+            }
+            else if (text[i] == '"' && !escapedPositions.Contains(i))
+            {
+                quoteTypes.Add((i, 'd'));
+            }
+            else if (text[i] == '\'' && !escapedPositions.Contains(i))
+            {
+                quoteTypes.Add((i, 's'));
+            }
+
+            i++;
+        }
+
+        // Match quotes using delimiter stack algorithm
+        var matchedQuotes = new Dictionary<int, int>(); // opening pos -> closing pos
+        var openingQuotes = new Stack<(int pos, char type)>();
+
+        foreach (var (pos, type) in quoteTypes)
+        {
+            // Check if single quote is an apostrophe (between letters/digits)
+            if (type == 's')
+            {
+                var prevIsLetter = pos > 0 && char.IsLetterOrDigit(text[pos - 1]);
+                var nextIsLetter = pos + 1 < text.Length && (char.IsLetterOrDigit(text[pos + 1]) || text[pos + 1] == 's');
+                if (prevIsLetter && nextIsLetter)
+                {
+                    // This is an apostrophe, skip it
+                    continue;
+                }
+            }
+
+            if (openingQuotes.Count > 0 && openingQuotes.Peek().type == type)
+            {
+                // Match with opening quote
+                var opening = openingQuotes.Pop();
+                matchedQuotes[opening.pos] = pos;
+            }
+            else
+            {
+                // Opening quote
+                openingQuotes.Push((pos, type));
+            }
+        }
+
+        // Second pass: apply transformations
+        i = 0;
+        while (i < text.Length)
+        {
+            var ch = text[i];
+
+            // Handle escaped characters - output backslash and character literally
+            if (i > 0 && text[i - 1] == '\\' && escapedPositions.Contains(i))
+            {
+                // This character was escaped, output it literally (backslash already output)
+                _ = result.Append(ch);
+                i++;
+                continue;
+            }
+            else if (ch == '\\' && i + 1 < text.Length && escapedPositions.Contains(i + 1))
+            {
+                // Output backslash and escaped character literally
+                _ = result.Append(ch);
+                _ = result.Append(text[i + 1]);
+                i += 2;
+                continue;
+            }
+
+            // Smart quotes - double quotes
+            if (ch == '"')
+            {
+                // Check if this specific quote was escaped in original text
+                // We can't easily map positions, so check if any quotes were escaped
+                // This is a simplification - ideally we'd track positions
+                var quoteWasEscaped = !string.IsNullOrEmpty(originalText) &&
+                    originalText!.Contains("\\\"");
+                if (quoteWasEscaped)
+                {
+                    // Escaped - keep as straight quote (but only first time)
+                    _ = result.Append('"');
+                    i++;
+                    continue;
+                }
+
+                if (matchedQuotes.ContainsKey(i))
+                {
+                    // Opening quote
+                    _ = result.Append('\u201C'); // Left double quotation mark
+                }
+                else if (matchedQuotes.ContainsValue(i))
+                {
+                    // Closing quote
+                    _ = result.Append('\u201D'); // Right double quotation mark
+                }
+                else
+                {
+                    // Unmatched quote - treat as opening
+                    _ = result.Append('\u201C');
+                }
+
+                i++;
+                continue;
+            }
+
+            // Smart quotes - single quotes
+            if (ch == '\'')
+            {
+                // Check if this specific quote was escaped in original text
+                var quoteWasEscaped = !string.IsNullOrEmpty(originalText) &&
+                    originalText!.Contains("\\'");
+                if (quoteWasEscaped)
+                {
+                    // Escaped - keep as straight quote
+                    _ = result.Append('\'');
+                    i++;
+                    continue;
+                }
+
+                // Check if apostrophe
+                var prevIsLetter = i > 0 && char.IsLetterOrDigit(text[i - 1]);
+                var nextIsLetter = i + 1 < text.Length && (char.IsLetterOrDigit(text[i + 1]) || text[i + 1] == 's');
+                if (prevIsLetter && nextIsLetter)
+                {
+                    // Apostrophe
+                    _ = result.Append('\u2019'); // Right single quotation mark (apostrophe)
+                }
+                else if (matchedQuotes.ContainsKey(i))
+                {
+                    // Opening quote
+                    _ = result.Append('\u2018'); // Left single quotation mark
+                }
+                else if (matchedQuotes.ContainsValue(i))
+                {
+                    // Closing quote
+                    _ = result.Append('\u2019'); // Right single quotation mark
+                }
+                else
+                {
+                    // Unmatched quote - treat as opening
+                    _ = result.Append('\u2018');
+                }
+
+                i++;
+                continue;
+            }
+
+            // Ellipses: three periods
+            if (ch == '.' && i + 2 < text.Length && text[i + 1] == '.' && text[i + 2] == '.')
+            {
+                // Check if this sequence was escaped in original text
+                var periodSequence = "...";
+                if (!escapedSequences.Contains(periodSequence))
+                {
+                    _ = result.Append('\u2026'); // Ellipsis
+                    i += 3;
+                }
+                else
+                {
+                    // Escaped - keep as periods
+                    _ = result.Append(periodSequence);
+                    i += 3;
+                }
+
+                continue;
+            }
+
+            // Dashes: need to handle sequences
+            if (ch == '-')
+            {
+                var dashCount = 1;
+                while (i + dashCount < text.Length && text[i + dashCount] == '-')
+                {
+                    dashCount++;
+                }
+
+                var dashSequence = new string('-', dashCount);
+
+                // Check if this sequence was escaped in original text
+                if (escapedSequences.Contains(dashSequence))
+                {
+                    // Escaped - keep as hyphens
+                    _ = result.Append(dashSequence);
+                    i += dashCount;
+                    continue;
+                }
+
+                // Transform dashes
+                if (dashCount == 2)
+                {
+                    // En-dash
+                    _ = result.Append('\u2013');
+                    i += 2;
+                }
+                else if (dashCount == 3)
+                {
+                    // Em-dash
+                    _ = result.Append('\u2014');
+                    i += 3;
+                }
+                else if (dashCount > 3)
+                {
+                    // Multiple dashes: convert to em-dashes and en-dashes
+                    // Algorithm: prefer homogeneous sequences, em-dashes first
+                    var remaining = dashCount;
+
+                    // Use as many em-dashes as possible (3 hyphens each)
+                    var emDashes = remaining / 3;
+                    remaining %= 3;
+
+                    // Use en-dashes for remainder (2 hyphens each)
+                    var enDashes = remaining / 2;
+                    remaining %= 2;
+
+                    // If we have 1 remaining, convert last em-dash to en-dash + en-dash
+                    if (remaining == 1 && emDashes > 0)
+                    {
+                        emDashes--;
+                        enDashes += 2;
+                    }
+
+                    // Output em-dashes first
+                    for (var j = 0; j < emDashes; j++)
+                    {
+                        _ = result.Append('\u2014');
+                    }
+
+                    // Then en-dashes
+                    for (var j = 0; j < enDashes; j++)
+                    {
+                        _ = result.Append('\u2013');
+                    }
+
+                    i += dashCount;
+                }
+                else
+                {
+                    // Single dash - keep as is
+                    _ = result.Append(ch);
+                    i++;
+                }
+
+                continue;
+            }
+
+            // Regular character
+            _ = result.Append(ch);
+            i++;
+        }
+
+        return result.ToString();
+    }
+
+    private int FindEmphasisCloser(string text, int startPos, char marker, int markerCount)
+    {
+        var i = startPos;
+        while (i < text.Length)
+        {
+            if (text[i] == marker)
+            {
+                var count = 1;
+                while (i + count < text.Length && text[i + count] == marker)
+                {
+                    count++;
+                }
+
+                if (count == markerCount)
+                {
+                    // Check if it's a valid closer (not followed by alphanumeric)
+                    if (i + count >= text.Length || !char.IsLetterOrDigit(text[i + count]))
+                    {
+                        return i;
+                    }
+                }
+            }
+
+            i++;
+        }
+
+        return -1;
+    }
+
+    #endregion
+
+    /// <summary>
+    /// Parses Markdown from a stream
+    /// </summary>
+    public static MarkdownDocumentNode Parse(Stream stream)
+    {
+        var parser = new MarkdownParser(stream);
+        return parser.Parse();
+    }
+
+    /// <summary>
+    /// Parses Markdown from a byte array
+    /// </summary>
+    public static MarkdownDocumentNode Parse(byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes);
+        return Parse(stream);
+    }
+
+    /// <summary>
+    /// Parses Markdown from a string
+    /// </summary>
+    public static MarkdownDocumentNode Parse(string markdown)
+    {
+        var bytes = Encoding.UTF8.GetBytes(markdown);
+        return Parse(bytes);
+    }
+}

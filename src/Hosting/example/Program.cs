@@ -6,19 +6,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Femur.Hosting.Example;
 
-class Program
+internal sealed class Program
 {
-    static async Task<int> Main(string[] args) =>
+    private static async Task<int> Main(string[] args) =>
         await ApplicationBuilder.Create(args)
             .UseDefaultConsoleLogging()
             .ConfigureConfiguration(config =>
             {
-                config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
-                config.AddEnvironmentVariables();
+                _ = config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+                _ = config.AddEnvironmentVariables();
             })
             .ConfigureServices(services =>
             {
-                services.AddSingleton<IGreetingService, GreetingService>();
+                _ = services.AddSingleton<IGreetingService, GreetingService>();
             })
             .SkipConfigureErrorHandlers()
             .RunAsync<SimpleConsoleService>();
@@ -38,32 +38,34 @@ public class SimpleConsoleService : IConsoleApplication
         IGreetingService greetingService,
         IConfiguration config)
     {
-        _logger = logger;
-        _greetingService = greetingService;
-        _config = config;
+        this._logger = logger;
+        this._greetingService = greetingService;
+        this._config = config;
     }
 
     public async Task<int> ExecuteAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Simple console application started");
+        this._logger.LogInformation("Simple console application started");
 
         // Get name from configuration or use default
-        var name = _config["Name"] ?? "World";
+        var name = this._config["Name"] ?? "World";
 
         // Use the greeting service
-        var greeting = _greetingService.GetGreeting(name);
-        _logger.LogInformation(greeting);
+        var greeting = this._greetingService.GetGreeting(name);
+#pragma warning disable CA2254 // Template should be a static expression
+        this._logger.LogInformation(greeting);
+#pragma warning restore CA2254 // Template should be a static expression
 
         // Simulate some work
-        for (int i = 1; i <= 3; i++)
+        for (var i = 1; i <= 3; i++)
         {
             if (cancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning("Application was cancelled at step {step}", i);
+                this._logger.LogWarning("Application was cancelled at step {Step}", i);
                 return 1; // Return non-zero exit code for cancellation
             }
 
-            _logger.LogInformation("Processing step {step}", i);
+            this._logger.LogInformation("Processing step {Step}", i);
 
             try
             {
@@ -71,12 +73,12 @@ public class SimpleConsoleService : IConsoleApplication
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning("Task was cancelled during delay at step {step}", i);
+                this._logger.LogWarning("Task was cancelled during delay at step {Step}", i);
                 return 1; // Return non-zero exit code for cancellation
             }
         }
 
-        _logger.LogInformation("Simple console application completed successfully");
+        this._logger.LogInformation("Simple console application completed successfully");
         return 0; // Return 0 for successful completion
     }
 }
@@ -92,12 +94,12 @@ public class GreetingService : IGreetingService
 
     public GreetingService(ILogger<GreetingService> logger)
     {
-        _logger = logger;
+        this._logger = logger;
     }
 
     public string GetGreeting(string name)
     {
-        _logger.LogDebug("Creating greeting for {name}", name);
+        this._logger.LogDebug("Creating greeting for {Name}", name);
         return $"Hello, {name}! Welcome to the simplified console app.";
     }
 }

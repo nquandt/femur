@@ -51,6 +51,58 @@
     <Project Path="src/Hosting/Web/example/Femur.Hosting.Web.Example.csproj" />
   </Folder>
 
+  <Folder Name="/src/Parsing/src/">
+    <Project Path="src/Parsing/src/Femur.Parsing.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Markup.Abstractions/src/">
+    <Project Path="src/Markup.Abstractions/src/Femur.Markup.Abstractions.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Html/Parser/src/">
+    <Project Path="src/Html/Parser/src/Femur.Html.Parser.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Xml/Abstractions/src/">
+    <Project Path="src/Xml/Abstractions/src/Femur.Xml.Abstractions.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Xml/Parser/src/">
+    <Project Path="src/Xml/Parser/src/Femur.Xml.Parser.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Markdown/Abstractions/src/">
+    <Project Path="src/Markdown/Abstractions/src/Femur.Markdown.Abstractions.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Markdown/Parser/src/">
+    <Project Path="src/Markdown/Parser/src/Femur.Markdown.Parser.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Markdown/Renderer/src/">
+    <Project Path="src/Markdown/Renderer/src/Femur.Markdown.Renderer.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Parsing/tests/">
+    <Project Path="src/Parsing/tests/StreamParserTests/StreamParserTests.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Html/tests/">
+    <Project Path="src/Html/tests/HtmlParserTests/HtmlParserTests.csproj" />
+    <Project Path="src/Html/tests/HtmlParserTests.NetStandard20/HtmlParserTests.NetStandard20.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Xml/tests/">
+    <Project Path="src/Xml/tests/XmlParserTests/XmlParserTests.csproj" />
+    <Project Path="src/Xml/tests/XmlParserTests.NetStandard20/XmlParserTests.NetStandard20.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Markdown/tests/">
+    <Project Path="src/Markdown/tests/MarkdownParserTests/MarkdownParserTests.csproj" />
+    <Project Path="src/Markdown/tests/MarkdownParserTests.NetStandard20/MarkdownParserTests.NetStandard20.csproj" />
+    <Project Path="src/Markdown/tests/MarkdownRendererTests/MarkdownRendererTests.csproj" />
+  </Folder>
+
   <Folder Name="/src/tests/">
     <Project Path="src/tests/Femur.Tests.csproj" />
   </Folder>

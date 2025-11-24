@@ -19,7 +19,7 @@ public sealed class RouteHandlerBuilder : IEndpointConventionBuilder
     }
 
     /// <summary>
-    /// Instantiates a new <see cref="Microsoft.AspNetCore.Builder.Override.RouteHandlerBuilder" /> given multiple
+    /// Instantiates a new <see cref="RouteHandlerBuilder" /> given multiple
     /// <see cref="IEndpointConventionBuilder" /> instances.
     /// </summary>
     /// <param name="endpointConventionBuilders">A sequence of <see cref="IEndpointConventionBuilder" /> instances.</param>

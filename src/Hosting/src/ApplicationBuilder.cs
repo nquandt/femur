@@ -3,8 +3,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Femur.Hosting.Web")]
@@ -33,9 +31,9 @@ public class ApplicationBuilder :
     private Func<ILogger, Exception, Task>? _onPostShutdownError;
     private Action<ILoggingBuilder> _useBootstrapLogging = builder =>
     {
-        builder.ClearProviders();
-        builder.AddConsole();
-        builder.SetMinimumLevel(LogLevel.Information);
+        _ = builder.ClearProviders();
+        _ = builder.AddConsole();
+        _ = builder.SetMinimumLevel(LogLevel.Information);
     };
 
     // State tracking for enforcing single calls
@@ -328,11 +326,11 @@ public class ApplicationBuilder :
         try
         {
             var sc = new ServiceCollection();
-            sc.AddLogging(builder =>
+            _ = sc.AddLogging(builder =>
             {
-                builder.ClearProviders();
-                builder.AddConsole();
-                builder.SetMinimumLevel(LogLevel.Information);
+                _ = builder.ClearProviders();
+                _ = builder.AddConsole();
+                _ = builder.SetMinimumLevel(LogLevel.Information);
             });
             var sp = sc.BuildServiceProvider();
 
@@ -425,18 +423,15 @@ public class ApplicationBuilder :
         this._configureServices = services =>
         {
             // If there was a previous configuration, apply it first
-            if (previousConfigureServices != null)
-            {
-                previousConfigureServices(services);
-            }
+            _ = (previousConfigureServices?.Invoke(services));
 
             // Register the console application only if not already registered            
             services.TryAddSingleton<TApplication>();
 
             // Register the wrapper hosted service
-            services.AddSingleton<ConsoleApplicationHostedService<TApplication>>();
-            services.AddSingleton<IConsoleApplicationHostedService>(sp => sp.GetRequiredService<ConsoleApplicationHostedService<TApplication>>());
-            services.AddHostedService(provider =>
+            _ = services.AddSingleton<ConsoleApplicationHostedService<TApplication>>();
+            _ = services.AddSingleton<IConsoleApplicationHostedService>(sp => sp.GetRequiredService<ConsoleApplicationHostedService<TApplication>>());
+            _ = services.AddHostedService(provider =>
                 provider.GetRequiredService<ConsoleApplicationHostedService<TApplication>>());
 
             return Task.CompletedTask;
@@ -477,7 +472,7 @@ public class ApplicationBuilder :
             }
 
             // Configure logging in the application container using the same configuration as bootstrap
-            hostBuilder.Logging.ClearProviders();
+            _ = hostBuilder.Logging.ClearProviders();
             this._useBootstrapLogging(hostBuilder.Logging);
 
             bootstrapLogger.LogInformation("Building console application host");

@@ -5,7 +5,7 @@ using System.Reflection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 
-namespace Femur;
+namespace Femur.AspNetCore.Endpoints;
 
 public static class FemurEndpointsExtensions
 {
@@ -30,7 +30,7 @@ public static class FemurEndpointsExtensions
 
         var del = DelegateGenerator.CreateStaticDelegate(typeof(T), methodInfo);
 
-        return endpoints.MapMethods(routePattern, httpMethods, del);        
+        return endpoints.MapMethods(routePattern, httpMethods, del);
     }
 
     public static RouteHandlerBuilder MapEndpoint<T>(this IEndpointRouteBuilder endpoints,
@@ -39,12 +39,12 @@ public static class FemurEndpointsExtensions
         Expression<Func<T, Delegate>> expression)
             where T : class
     {
-        return endpoints.MapEndpoint<T>(routePattern, GetVerbStrings(httpMethods), expression);        
+        return endpoints.MapEndpoint(routePattern, GetVerbStrings(httpMethods), expression);
     }
 
     private static IEnumerable<string> GetVerbStrings(IEnumerable<HttpMethod> httpMethods)
     {
-        var _mapping = new Dictionary<HttpMethod, string>()
+        var mapping = new Dictionary<HttpMethod, string>()
         {
             [HttpMethod.Trace] = "TRACE",
             [HttpMethod.Head] = "HEAD",
@@ -60,13 +60,13 @@ public static class FemurEndpointsExtensions
         var finalMethods = new List<string>();
         foreach (var att in httpMethods)
         {
-            if (!_mapping.ContainsKey(att))
+            if (!mapping.ContainsKey(att))
             {
                 //TODO probably do something if we dont support verb?
                 continue;
             }
 
-            finalMethods.Add(_mapping[att]);
+            finalMethods.Add(mapping[att]);
         }
 
         return finalMethods;

@@ -1,7 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.Options;
 
-namespace Femur;
+namespace Femur.Options;
 
 public class FluentValidationOptions<TOptions> : IValidateOptions<TOptions>
     where TOptions : class

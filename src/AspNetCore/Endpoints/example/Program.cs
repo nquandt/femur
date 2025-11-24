@@ -1,4 +1,4 @@
-using Femur;
+using Femur.AspNetCore.Endpoints;
 using Femur.AspNetCore.Endpoints.Example;
 using Microsoft.AspNetCore.Mvc;
 

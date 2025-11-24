@@ -1,3 +1,4 @@
+using Femur.Options;
 using FluentValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,13 +25,13 @@ public class ServiceCollectionTests
 
         var json = "{\"TestSection\": { \"BaseUrl\": \"https://www.github.com\" } }";
         var jsonStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(json));
-        configurationBuilder.AddJsonStream(jsonStream);
+        _ = configurationBuilder.AddJsonStream(jsonStream);
 
         var configuration = configurationBuilder.Build();
         var services = new ServiceCollection();
         services.TryAddSingleton<IConfiguration>(configuration);
 
-        services.TryConfigureByConventionWithValidation<TestSectionOptions>();
+        _ = services.TryConfigureByConventionWithValidation<TestSectionOptions>();
         var sp = services.BuildServiceProvider();
 
 
@@ -62,13 +63,13 @@ public class ServiceCollectionTests
 
         var json = "{\"TestSection\": { \"BaseUrl\": \"hsl/llama\" } }";
         var jsonStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(json));
-        configurationBuilder.AddJsonStream(jsonStream);
+        _ = configurationBuilder.AddJsonStream(jsonStream);
 
         var configuration = configurationBuilder.Build();
         var services = new ServiceCollection();
         services.TryAddSingleton<IConfiguration>(configuration);
 
-        services.TryConfigureByConventionWithValidation<TestSectionOptions>();
+        _ = services.TryConfigureByConventionWithValidation<TestSectionOptions>();
         var sp = services.BuildServiceProvider();
 
 
@@ -85,7 +86,7 @@ public class ServiceCollectionTests
 
         Assert.Equal("Microsoft.Extensions.Options.StartupValidator", validator.GetType().FullName);
 
-        var except = await Assert.ThrowsAsync<Microsoft.Extensions.Options.OptionsValidationException>(task);
+        var except = await Assert.ThrowsAsync<OptionsValidationException>(task);
 
         // _output.WriteLine(except.Message);
         Assert.Contains("FluentValidation failed for", except.Message);
@@ -102,7 +103,7 @@ public class ServiceCollectionTests
         var services = new ServiceCollection();
         services.TryAddSingleton<IConfiguration>(configuration);
 
-        services.TryConfigureByConventionWithValidation<TestSectionOptions>();
+        _ = services.TryConfigureByConventionWithValidation<TestSectionOptions>();
         var sp = services.BuildServiceProvider();
 
         //Act
@@ -115,7 +116,7 @@ public class ServiceCollectionTests
 
         //Assert
         Assert.Equal("Microsoft.Extensions.Options.StartupValidator", validator.GetType().FullName);
-        var except = await Assert.ThrowsAsync<Microsoft.Extensions.Options.OptionsValidationException>(task);
+        var except = await Assert.ThrowsAsync<OptionsValidationException>(task);
 
         // _output.WriteLine(except.Message);
         Assert.Contains("FluentValidation failed for", except.Message);
@@ -134,10 +135,10 @@ public class TestSectionOptions : IStandardOptions<TestSectionOptions>
 
     public static void SetupValidator(AbstractValidator<TestSectionOptions> validator)
     {
-        validator.RuleFor(x => x.BaseUrl)
+        _ = validator.RuleFor(x => x.BaseUrl)
             .NotEmpty()
             .WithMessage($"{nameof(TestSectionOptions.BaseUrl)} must not be empty")
-            .Must(x => x?.StartsWith("/") == true ? Uri.TryCreate(x, UriKind.Relative, out var _) : Uri.TryCreate(x, UriKind.Absolute, out var _))
+            .Must(x => x?.StartsWith("/") == true ? Uri.TryCreate(x, UriKind.Relative, out _) : Uri.TryCreate(x, UriKind.Absolute, out _))
             .WithMessage($"{nameof(TestSectionOptions.BaseUrl)} must not be a valid Uri");
     }
 
@@ -150,10 +151,10 @@ public class TestOptionsValidator : AbstractValidator<TestSectionOptions>
 {
     public TestOptionsValidator()
     {
-        RuleFor(x => x.BaseUrl)
+        _ = RuleFor(x => x.BaseUrl)
             .NotEmpty()
             .WithMessage($"{nameof(TestSectionOptions.BaseUrl)} must not be empty")
-            .Must(x => x?.StartsWith("/") == true ? Uri.TryCreate(x, UriKind.Relative, out var _) : Uri.TryCreate(x, UriKind.Absolute, out var _))
+            .Must(x => x?.StartsWith("/") == true ? Uri.TryCreate(x, UriKind.Relative, out _) : Uri.TryCreate(x, UriKind.Absolute, out _))
             .WithMessage($"{nameof(TestSectionOptions.BaseUrl)} must not be a valid Uri");
     }
 }

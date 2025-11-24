@@ -1,10 +1,4 @@
 // ```test/Serialization.Tests/DefaultAsyncSerializerFactoryTests.cs
-using System.Collections.Generic;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
-using Xunit;
-
 namespace Femur.Serialization.Tests;
 
 public class DefaultAsyncSerializerFactoryTests

@@ -1,26 +1,25 @@
-
-
-using System;
 using System.Diagnostics;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
+namespace Femur.Hosting;
+
 public class BootstrapLogger : ILogger, IDisposable
 {
-    private ILogger _logger => GetLogger();
+    private ILogger Logger => this.GetLogger();
     private readonly IServiceProvider _serviceProvider;
     private bool _disposed;
     public BootstrapLogger(Action<ILoggingBuilder> configure)
     {
         // service collection
         var services = new ServiceCollection();
-        services.AddLogging(configure);
-        _serviceProvider = services.BuildServiceProvider();
+        _ = services.AddLogging(configure);
+        this._serviceProvider = services.BuildServiceProvider();
     }
 
-    private static readonly Lazy<Type> _programType = new(DiscoverProgramType);
-    private static readonly Lazy<string> _loggerCategoryName = new(() => GetLoggerCategoryName(_programType.Value));
+    private static readonly Lazy<Type> ProgramType = new(DiscoverProgramType);
+    private static readonly Lazy<string> LoggerCategoryName = new(() => GetLoggerCategoryName(ProgramType.Value));
 
     /// <summary>
     /// Discovers the Program class type using reflection by looking for the entry point.
@@ -119,62 +118,60 @@ public class BootstrapLogger : ILogger, IDisposable
     /// <returns>A logger category name derived from the discovered program type.</returns>
     internal static string GetLoggerCategoryName()
     {
-        return _loggerCategoryName.Value;
+        return LoggerCategoryName.Value;
     }
 
 
     public ILogger GetLogger()
     {
-        ThrowIfDisposed();
-        var loggerType = typeof(ILogger<>).MakeGenericType(_programType.Value);
-        var logger = (ILogger)_serviceProvider.GetRequiredService(loggerType);
+        this.ThrowIfDisposed();
+        var loggerType = typeof(ILogger<>).MakeGenericType(ProgramType.Value);
+        var logger = (ILogger)this._serviceProvider.GetRequiredService(loggerType);
 
         return logger;
     }
 
     protected virtual void Dispose(bool disposing)
     {
-        if (_disposed) return;
+        if (this._disposed)
+        {
+            return;
+        }
 
         if (disposing)
         {
-            if (_serviceProvider is IDisposable disposable)
+            if (this._serviceProvider is IDisposable disposable)
             {
                 disposable.Dispose();
             }
         }
 
-        _disposed = true;
+        this._disposed = true;
     }
 
     public void Dispose()
     {
-        Dispose(true);
+        this.Dispose(true);
         GC.SuppressFinalize(this);
-    }
-
-    ~BootstrapLogger()
-    {
-        Dispose(false);
     }
 
     private void ThrowIfDisposed()
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(BootstrapLogger));
+        ObjectDisposedException.ThrowIf(this._disposed, nameof(BootstrapLogger));
     }
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        _logger.Log(logLevel, eventId, state, exception, formatter);
+        this.Logger.Log(logLevel, eventId, state, exception, formatter);
     }
 
     public bool IsEnabled(LogLevel logLevel)
     {
-        return _logger.IsEnabled(logLevel);
+        return this.Logger.IsEnabled(logLevel);
     }
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull
     {
-        return _logger.BeginScope(state);
+        return this.Logger.BeginScope(state);
     }
 }

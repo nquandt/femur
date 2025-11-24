@@ -4,29 +4,29 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
-namespace Femur;
+namespace Femur.Options;
 
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection TryConfigureByConventionWithValidation<TOptions>(this IServiceCollection services)
         where TOptions : class, IStandardOptions<TOptions>
     {
-        string name = string.Empty;
+        var name = string.Empty;
 
-        string sectionName = TOptions.SectionName;
+        var sectionName = TOptions.SectionName;
 
         services.TryAddSingleton<IValidator<TOptions>>(sp => new DefaultValidator<TOptions>(TOptions.SetupValidator));
 
-        services.AddOptions<TOptions>();
+        _ = services.AddOptions<TOptions>();
 
-        services.AddValidationFor<IOptionsMonitor<TOptions>>((opt, sp) =>
+        _ = services.AddValidationFor<IOptionsMonitor<TOptions>>((opt, sp) =>
         {
             var fl = new FluentValidationOptions<TOptions>(sp.GetService<IValidator<TOptions>>());
 
             return fl.Validate(null, opt.CurrentValue);
         });
 
-        services.TryConfigureByConvention<TOptions>();
+        _ = services.TryConfigureByConvention<TOptions>();
 
         return services;
     }
@@ -34,9 +34,9 @@ public static class ServiceCollectionExtensions
     internal static IServiceCollection TryConfigureByConvention<TOptions>(this IServiceCollection services)
         where TOptions : class, IStandardOptions<TOptions>
     {
-        string name = string.Empty;
+        var name = string.Empty;
 
-        string sectionName = TOptions.SectionName;
+        var sectionName = TOptions.SectionName;
 
         services.TryAddSingleton<IOptionsChangeTokenSource<TOptions>>(sp => new ConfigurationChangeTokenSource<TOptions>(name, sp.GetRequiredService<IConfiguration>().GetSection(sectionName)));
         services.TryAddSingleton<IConfigureOptions<TOptions>>(sp => new NamedConfigureFromConfigurationOptions<TOptions>(name, sp.GetRequiredService<IConfiguration>().GetSection(sectionName), _ => { }));
@@ -47,17 +47,17 @@ public static class ServiceCollectionExtensions
     internal static IServiceCollection AddValidationFor<TDep>(this IServiceCollection services, Func<TDep, IServiceProvider, ValidateOptionsResult> func)
         where TDep : class
     {
-        services.AddOptions<FakeOptions<TDep>>()
+        _ = services.AddOptions<FakeOptions<TDep>>()
             .Configure(x => { })
             .ValidateOnStart();
 
-        services.AddSingleton<IValidateOptions<FakeOptions<TDep>>>(sp => new BooleanServiceValidator<TDep>(func, sp));
+        _ = services.AddSingleton<IValidateOptions<FakeOptions<TDep>>>(sp => new BooleanServiceValidator<TDep>(func, sp));
 
         return services;
     }
 }
 
-internal class BooleanServiceValidator<TOptions> : IValidateOptions<FakeOptions<TOptions>>
+internal sealed class BooleanServiceValidator<TOptions> : IValidateOptions<FakeOptions<TOptions>>
     where TOptions : class
 {
     private readonly Func<TOptions, IServiceProvider, ValidateOptionsResult> _validationAction;
@@ -80,8 +80,4 @@ internal class BooleanServiceValidator<TOptions> : IValidateOptions<FakeOptions<
 
         return this._validationAction(actualService, this._serviceProvider);
     }
-}
-
-internal class FakeOptions<T>
-{
 }

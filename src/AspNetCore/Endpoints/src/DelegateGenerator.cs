@@ -2,18 +2,18 @@ using System.Reflection;
 using System.Reflection.Emit;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Femur;
+namespace Femur.AspNetCore.Endpoints;
 
-public class DelegateGenerator
+public static class DelegateGenerator
 {
     // This holds an assembly in memory.. eek    
-    private static readonly ModuleBuilder ModuleBuilder;
+    private static readonly ModuleBuilder ModuleBuilder = CreateModuleBuilder();
 
-    static DelegateGenerator()
+    private static ModuleBuilder CreateModuleBuilder()
     {
         var assemblyName = new AssemblyName("DynamicDelegatesAssembly");
         var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
-        ModuleBuilder = assemblyBuilder.DefineDynamicModule("MainModule");
+        return assemblyBuilder.DefineDynamicModule("MainModule");
     }
 
     /// <summary>
@@ -24,7 +24,10 @@ public class DelegateGenerator
     /// <exception cref="NullReferenceException"></exception>
     public static Type CreateDelegateType(MethodInfo methodInfo)
     {
-        if (methodInfo.DeclaringType == null) { throw new NullReferenceException("Method DeclaringType cannot be null"); }
+        if (methodInfo.DeclaringType == null)
+        {
+            throw new NullReferenceException("Method DeclaringType cannot be null");
+        }
 
         var typeBuilder = ModuleBuilder.DefineType(
                 $"{methodInfo.DeclaringType.Name}_{methodInfo.Name}_Delegate",
@@ -43,15 +46,18 @@ public class DelegateGenerator
             methodInfo.ReturnType, parameters.Select(p => p.ParameterType).ToArray());
         invokeMethod.SetImplementationFlags(MethodImplAttributes.CodeTypeMask);
 
-        for (int i = 0; i < parameters.Length; i++)
+        for (var i = 0; i < parameters.Length; i++)
         {
             var parameter = parameters[i];
-            invokeMethod.DefineParameter(i + 1, ParameterAttributes.None, parameter.Name);
+            _ = invokeMethod.DefineParameter(i + 1, ParameterAttributes.None, parameter.Name);
         }
 
         var returnType = typeBuilder.CreateType();
 
-        if (returnType == null) { throw new NullReferenceException("Something went wrong creating delegate type"); }
+        if (returnType == null)
+        {
+            throw new NullReferenceException("Something went wrong creating delegate type");
+        }
 
         return returnType;
     }
@@ -65,13 +71,15 @@ public class DelegateGenerator
     /// <returns></returns>
     public static Delegate CreateStaticDelegate(Type targetType, MethodInfo methodInfo)
     {
-        ParameterInfo[] parameters = methodInfo.GetParameters();
-        Type[] methodParams = new Type[parameters.Length + 1];
+        var parameters = methodInfo.GetParameters();
+        var methodParams = new Type[parameters.Length + 1];
 
         // First parameter is the instance
         methodParams[0] = targetType;
-        for (int i = 0; i < parameters.Length; i++)
+        for (var i = 0; i < parameters.Length; i++)
+        {
             methodParams[i + 1] = parameters[i].ParameterType;
+        }
 
         // Define a new type that will hold the static method
         var typeBuilder = ModuleBuilder.DefineType(GetUniqueName($"{targetType.Name}_Invoker"), TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
@@ -87,7 +95,7 @@ public class DelegateGenerator
         var instanceParamBuilder = methodBuilder.DefineParameter(1, ParameterAttributes.None, "instance");
 
         // Apply [FromServices] attribute to the 'instance' parameter
-        ConstructorInfo fromServicesCtor = typeof(FromServicesAttribute).GetConstructor(Type.EmptyTypes)!;
+        var fromServicesCtor = typeof(FromServicesAttribute).GetConstructor(Type.EmptyTypes)!;
         if (fromServicesCtor != null)
         {
             var fromServicesAttr = new CustomAttributeBuilder(fromServicesCtor, Array.Empty<object>());
@@ -95,33 +103,34 @@ public class DelegateGenerator
         }
 
         // set parameter names
-        for (int i = 0; i < parameters.Length; i++)
+        for (var i = 0; i < parameters.Length; i++)
         {
             var paramBuilder = methodBuilder.DefineParameter(i + 2, ParameterAttributes.None, parameters[i].Name);
 
             //copy the attributes over for argumentsFromQuery, FromRoute, FromHeaders etc.
             foreach (var customAttribute in parameters[i].CustomAttributes)
             {
-                ConstructorInfo customCtor = customAttribute.Constructor!;
+                var customCtor = customAttribute.Constructor!;
                 var customAttr = new CustomAttributeBuilder(customCtor, customAttribute.ConstructorArguments.Select(y => y.Value).ToArray());
                 paramBuilder.SetCustomAttribute(customAttr);
             }
         }
 
-        
+
         foreach (var customAttribute in methodInfo.CustomAttributes)
         {
-            ConstructorInfo customCtor = customAttribute.Constructor;
+            var customCtor = customAttribute.Constructor;
             if (customCtor is not null)
             {
-                var customAttr = new CustomAttributeBuilder(customCtor, customAttribute.ConstructorArguments.Select(y => {
+                var customAttr = new CustomAttributeBuilder(customCtor, customAttribute.ConstructorArguments.Select(y =>
+                {
                     if (y.Value is IEnumerable<CustomAttributeTypedArgument> c)
                     {
                         return c.Select(x => (string)x.Value!).ToArray();
                     }
 
-                    return (object?)y.Value;
-            }).ToArray());
+                    return y.Value;
+                }).ToArray());
 
                 methodBuilder.SetCustomAttribute(customAttr);
             }
@@ -129,14 +138,16 @@ public class DelegateGenerator
 
         // I don't know reflection.emit very well so i ripped this part from GPT.
         // Generate IL to call instance method
-        ILGenerator il = methodBuilder.GetILGenerator();
+        var il = methodBuilder.GetILGenerator();
 
         // Load the instance onto the stack
         il.Emit(OpCodes.Ldarg_0);
 
         // Load method arguments onto the stack
-        for (int i = 0; i < parameters.Length; i++)
+        for (var i = 0; i < parameters.Length; i++)
+        {
             il.Emit(OpCodes.Ldarg, i + 1);
+        }
 
         // Callvirt to invoke instance method
         il.Emit(OpCodes.Callvirt, methodInfo);
@@ -145,13 +156,13 @@ public class DelegateGenerator
         il.Emit(OpCodes.Ret);
 
         // Create the new type
-        Type generatedType = typeBuilder.CreateType()!;
+        var generatedType = typeBuilder.CreateType()!;
 
         // Get reference to the generated static method
-        MethodInfo generatedMethod = generatedType.GetMethod("Invoke")!;
+        var generatedMethod = generatedType.GetMethod("Invoke")!;
 
         // Create delegate type dynamically
-        Type delegateType = CreateDelegateType(generatedMethod);
+        var delegateType = CreateDelegateType(generatedMethod);
 
         // Return delegate pointing to generated static method
         return Delegate.CreateDelegate(delegateType, generatedMethod);
@@ -160,10 +171,13 @@ public class DelegateGenerator
 
     private static string GetUniqueName(string nameBase)
     {
-        int number = 2;
-        string name = nameBase;
+        var number = 2;
+        var name = nameBase;
         while (ModuleBuilder.GetType(name) != null)
+        {
             name = nameBase + number++;
+        }
+
         return name;
     }
 }

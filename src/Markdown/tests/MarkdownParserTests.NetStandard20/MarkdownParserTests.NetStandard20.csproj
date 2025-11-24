@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- Force referenced projects to use netstandard2.0 build for compatibility testing -->
+  <PropertyGroup>
+    <ReferencedProjectTargetFramework>netstandard2.0</ReferencedProjectTargetFramework>
+  </PropertyGroup>
+  
+  <Target Name="SetReferencedProjectTargetFramework" BeforeTargets="AssignProjectConfiguration">
+    <ItemGroup>
+      <ProjectReference Update="@(ProjectReference)">
+        <SetTargetFramework>TargetFramework=netstandard2.0</SetTargetFramework>
+      </ProjectReference>
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Parser/src/Femur.Markdown.Parser.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>
+

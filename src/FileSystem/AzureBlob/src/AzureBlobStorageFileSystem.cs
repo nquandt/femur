@@ -1,24 +1,17 @@
-
-
-using System;
-using System.IO;
-using System.Text;
-using System.Threading.Tasks;
 using Azure.Storage.Blobs;
-using Azure.Storage.Blobs.Models;
 
 namespace Femur.FileSystem.AzureBlob;
 
-public class AzureBlobFileSystem : IFileSystem
+public class AzureBlobStorageFileSystem : IFileSystem
 {
     private readonly BlobContainerClient _containerClient;
     private readonly string _rootDirectory;
 
-    public AzureBlobFileSystem(BlobContainerClient blobContainerClient, string rootDirectory)
-    {   
-        _containerClient = blobContainerClient;     
-        _containerClient.CreateIfNotExists();
-        _rootDirectory = rootDirectory.TrimEnd('/') + "/";
+    public AzureBlobStorageFileSystem(BlobContainerClient blobContainerClient, string rootDirectory)
+    {
+        this._containerClient = blobContainerClient;
+        _ = this._containerClient.CreateIfNotExists();
+        this._rootDirectory = rootDirectory.TrimEnd('/') + "/";
     }
 
     public Task CreateDirectoryAsync(string directoryPath, CancellationToken cancellationToken = default)
