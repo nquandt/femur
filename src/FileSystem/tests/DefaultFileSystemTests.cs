@@ -4,18 +4,28 @@ using System.Text;
 
 namespace Femur.FileSystem.Tests;
 
-public class DefaultFileSystemTests
+public class DefaultFileSystemTests : IDisposable
 {
     private readonly IFileSystem _fileSystem;
-    private readonly string _rootDirectory = Path.Combine(Path.GetTempPath(), "StandardFileSystemTests");
+    private readonly string _rootDirectory;
 
     public DefaultFileSystemTests()
     {
+        // Use a unique directory per test instance to avoid race conditions in parallel tests
+        _rootDirectory = Path.Combine(Path.GetTempPath(), $"StandardFileSystemTests-{Guid.NewGuid():N}");
+
+        // Create the root directory
+        _ = Directory.CreateDirectory(_rootDirectory);
+        _fileSystem = new DefaultFileSystem(_rootDirectory);
+    }
+
+    public void Dispose()
+    {
+        // Clean up after test completes
         if (Directory.Exists(_rootDirectory))
         {
             try
             {
-                // Remove read-only attributes and delete recursively
                 var directoryInfo = new DirectoryInfo(_rootDirectory);
                 directoryInfo.Attributes = FileAttributes.Normal;
                 foreach (var file in directoryInfo.GetFiles("*", SearchOption.AllDirectories))
@@ -24,32 +34,11 @@ public class DefaultFileSystemTests
                 }
                 Directory.Delete(_rootDirectory, true);
             }
-            catch (IOException)
+            catch
             {
-                // If deletion fails, try to remove individual files
-                try
-                {
-                    var directoryInfo = new DirectoryInfo(_rootDirectory);
-                    foreach (var file in directoryInfo.GetFiles("*", SearchOption.AllDirectories))
-                    {
-                        file.Attributes = FileAttributes.Normal;
-                        file.Delete();
-                    }
-                    foreach (var dir in directoryInfo.GetDirectories("*", SearchOption.AllDirectories))
-                    {
-                        dir.Attributes = FileAttributes.Normal;
-                        dir.Delete(true);
-                    }
-                    directoryInfo.Delete(true);
-                }
-                catch
-                {
-                    // If all else fails, just use the existing directory
-                }
+                // If cleanup fails, that's okay - temp directory can be cleaned up later
             }
         }
-        _ = Directory.CreateDirectory(_rootDirectory);
-        _fileSystem = new DefaultFileSystem(_rootDirectory);
     }
 
     [Fact]

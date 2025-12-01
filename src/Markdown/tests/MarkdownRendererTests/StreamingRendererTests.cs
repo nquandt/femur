@@ -55,12 +55,12 @@ public class StreamingRendererTests
         var markdown = @"- Item 1
 - Item 2
 - Item 3";
-        var expected = @"<ul>
+        var expected = NormalizeLineEndings(@"<ul>
 <li>Item 1</li>
 <li>Item 2</li>
 <li>Item 3</li>
 </ul>
-";
+");
 
         var result = RenderMarkdown(markdown);
 
@@ -73,12 +73,12 @@ public class StreamingRendererTests
         var markdown = @"1. First
 2. Second
 3. Third";
-        var expected = @"<ol>
+        var expected = NormalizeLineEndings(@"<ol>
 <li>First</li>
 <li>Second</li>
 <li>Third</li>
 </ol>
-";
+");
 
         var result = RenderMarkdown(markdown);
 
@@ -103,11 +103,11 @@ public void Method() { }
     {
         var markdown = @"> This is a quote
 > with two lines";
-        var expected = @"<blockquote>
+        var expected = NormalizeLineEndings(@"<blockquote>
 <p>This is a quote
 with two lines</p>
 </blockquote>
-";
+");
 
         var result = RenderMarkdown(markdown);
 
@@ -339,7 +339,7 @@ with two lines</p>
     {
         using var inputStream = new MemoryStream(Encoding.UTF8.GetBytes(markdown));
         using var outputStream = new MemoryStream();
-        using var writer = new StreamWriter(outputStream);
+        using var writer = new StreamWriter(outputStream) { NewLine = "\n" };
         using var renderer = new MarkdownHtmlStreamingRenderer(writer);
         using var parser = new MarkdownStreamingParser(inputStream, renderer);
 
@@ -347,5 +347,11 @@ with two lines</p>
         writer.Flush();
 
         return Encoding.UTF8.GetString(outputStream.ToArray());
+    }
+
+    private static string NormalizeLineEndings(string text)
+    {
+        // Normalize to Unix line endings
+        return text.Replace("\r\n", "\n");
     }
 }

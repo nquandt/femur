@@ -395,5 +395,258 @@ public class RegressionTests : IClassFixture<TestFixture>, IDisposable
         var paragraph2 = Assert.IsType<ParagraphNode>(result.Children[1]);
         // Unicode characters should not trigger emphasis
     }
+
+    #region List Tightness Tests (December 1, 2025)
+
+    [Fact]
+    public void Parse_TightList_IsLooseFalse()
+    {
+        // Tight list without blank lines between items
+        var markdown = "- Item 1\n- Item 2\n- Item 3";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var list = Assert.IsType<ListNode>(result.Children[0]);
+        Assert.False(list.IsLoose);
+    }
+
+    [Fact]
+    public void Parse_LooseList_IsLooseTrue()
+    {
+        // Loose list with blank lines between items
+        var markdown = "- Item 1\n\n- Item 2\n\n- Item 3";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var list = Assert.IsType<ListNode>(result.Children[0]);
+        Assert.True(list.IsLoose);
+    }
+
+    [Fact]
+    public void Parse_LooseListSingleBlankLine_IsLooseTrue()
+    {
+        // Loose list - one blank line between items is enough
+        var markdown = "- Item 1\n\n- Item 2";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var list = Assert.IsType<ListNode>(result.Children[0]);
+        Assert.True(list.IsLoose);
+    }
+
+    [Fact]
+    public void Parse_OrderedTightList_IsLooseFalse()
+    {
+        // Tight ordered list
+        var markdown = "1. Item 1\n2. Item 2\n3. Item 3";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var list = Assert.IsType<ListNode>(result.Children[0]);
+        Assert.False(list.IsLoose);
+    }
+
+    [Fact]
+    public void Parse_OrderedLooseList_IsLooseTrue()
+    {
+        // Loose ordered list
+        var markdown = "1. Item 1\n\n2. Item 2\n\n3. Item 3";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var list = Assert.IsType<ListNode>(result.Children[0]);
+        Assert.True(list.IsLoose);
+    }
+
+    [Fact]
+    public void Parse_ListWithParagraphContent_IsLooseIfBlankLines()
+    {
+        // List with block content should be loose if blank lines present
+        var markdown = "- Item 1\n\n  Paragraph in item\n\n- Item 2";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var list = Assert.IsType<ListNode>(result.Children[0]);
+        Assert.True(list.IsLoose);
+    }
+
+    [Fact]
+    public void Parse_NestedTightList_InnerListTight()
+    {
+        // Nested tight list
+        var markdown = "- Item 1\n  - Nested 1\n  - Nested 2\n- Item 2";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var list = Assert.IsType<ListNode>(result.Children[0]);
+        Assert.False(list.IsLoose);
+    }
+
+    #endregion
+
+    #region HTML Block Type Tests (December 1, 2025)
+
+    [Fact]
+    public void Parse_HtmlBlockType1_Script_ParsesCorrectly()
+    {
+        // Type 1: <script> tag
+        var markdown = "<script type=\"text/javascript\">\nalert('test');\n</script>\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("script", htmlBlock.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("alert", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType1_Style_ParsesCorrectly()
+    {
+        // Type 1: <style> tag
+        var markdown = "<style>\nbody { color: red; }\n</style>\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("style", htmlBlock.Content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType2_HtmlComment_ParsesCorrectly()
+    {
+        // Type 2: HTML comment
+        var markdown = "<!-- This is a comment\nMulti-line -->\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("<!--", htmlBlock.Content);
+        Assert.Contains("-->", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType3_ProcessingInstruction_ParsesCorrectly()
+    {
+        // Type 3: Processing instruction
+        var markdown = "<?php\necho 'test';\n?>\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("<?", htmlBlock.Content);
+        Assert.Contains("?>", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType4_Declaration_ParsesCorrectly()
+    {
+        // Type 4: Declaration
+        var markdown = "<!DOCTYPE html>\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("DOCTYPE", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType5_CDATA_ParsesCorrectly()
+    {
+        // Type 5: CDATA section
+        var markdown = "<![CDATA[\nSome data\n]]>\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("CDATA", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType6_KnownBlockTag_ParsesCorrectly()
+    {
+        // Type 6: Known block tags (div, blockquote, etc.)
+        var markdown = "<div>\nContent\n</div>\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("div", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType6_MultipleKnownTags_ParsesCorrectly()
+    {
+        // Type 6: Multiple known tags
+        var markdown = "<table>\n<tr><td>Data</td></tr>\n</table>\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("table", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType7_GenericTag_ParsesCorrectly()
+    {
+        // Type 7: Generic open tag (not script/pre/style) on its own line
+        var markdown = "<span>\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("span", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType7_SelfClosingTag_ParsesCorrectly()
+    {
+        // Type 7: Self-closing tag on its own line
+        var markdown = "<br />\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("br", htmlBlock.Content);
+    }
+
+    #endregion
+
+    #region Setext vs Thematic Break Precedence Tests (December 1, 2025)
+
+    [Fact]
+    public void Parse_SetextVsThematicBreak_ParagraphFollowedByDashes_IsSetext()
+    {
+        // A paragraph followed by dashes should be Setext heading, not thematic break + paragraph
+        var markdown = "Heading text\n---";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        Assert.Single(result.Children);
+        var heading = Assert.IsType<HeadingNode>(result.Children[0]);
+        Assert.Equal(2, heading.Level); // Level 2 for ---
+    }
+
+    [Fact]
+    public void Parse_SetextVsThematicBreak_StandaloneDashes_IsThematicBreak()
+    {
+        // Three dashes alone (not after text) should be thematic break
+        var markdown = "---";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        Assert.Single(result.Children);
+        var thematicBreak = Assert.IsType<ThematicBreakNode>(result.Children[0]);
+        Assert.NotNull(thematicBreak);
+    }
+
+    [Fact]
+    public void Parse_SetextVsThematicBreak_BlankLineThenDashes_IsThematicBreak()
+    {
+        // Blank line then dashes should be thematic break, not Setext
+        var markdown = "Paragraph text\n\n---";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        Assert.Equal(2, result.Children.Count);
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var thematicBreak = Assert.IsType<ThematicBreakNode>(result.Children[1]);
+        Assert.NotNull(thematicBreak);
+    }
+
+    [Fact]
+    public void Parse_SetextVsThematicBreak_SetextThenThematicBreak()
+    {
+        // Setext followed by thematic break (with blank line)
+        var markdown = "Heading\n===\n\n---";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        Assert.Equal(2, result.Children.Count);
+        var heading = Assert.IsType<HeadingNode>(result.Children[0]);
+        Assert.Equal(1, heading.Level); // === is level 1
+        var thematicBreak = Assert.IsType<ThematicBreakNode>(result.Children[1]);
+        Assert.NotNull(thematicBreak);
+    }
+
+    #endregion
 }
 

@@ -168,15 +168,10 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             }
 
             // Check for block-level constructs
-            // Note: Setext headings are checked after paragraphs are parsed
+            // Note: Setext headings are checked by looking ahead after paragraphs
             if (this.TryParseAtxHeading(trimmed, i, out var heading) && heading != null)
             {
                 this.AddBlock(heading);
-                i++;
-            }
-            else if (this.TryParseThematicBreak(trimmed, i, out var thematicBreak) && thematicBreak != null)
-            {
-                this.AddBlock(thematicBreak);
                 i++;
             }
             else if (this.TryParseFencedCodeBlock(trimmed, i, ref i, out var codeBlock) && codeBlock != null)
@@ -199,6 +194,15 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             else if (this.TryParseHtmlBlock(trimmed, i, ref i, out var htmlBlock) && htmlBlock != null)
             {
                 this.AddBlock(htmlBlock);
+            }
+            else if (this.TryParseThematicBreak(trimmed, i, out var thematicBreak) && thematicBreak != null)
+            {
+                // Thematic break is checked AFTER other constructs but BEFORE paragraphs
+                // This ensures that a line that could be a Setext underline is only treated as
+                // a thematic break if it's not immediately after a paragraph
+                // However, if we get here, there was no paragraph before it, so it's truly a thematic break
+                this.AddBlock(thematicBreak);
+                i++;
             }
             else
             {
@@ -678,6 +682,10 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         var savedParent = this._currentParent;
         this._currentParent = list;
 
+        // Track if we've seen a blank line between items (for tight/loose detection)
+        var hasBlankLineBetweenItems = false;
+        var blankLineCount = 0;
+
         // Parse list items
         while (currentIndex < this._lines!.Count)
         {
@@ -687,26 +695,37 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
 
             // Check if this line starts a new list item
             var isListItem = false;
-            if (isOrdered && char.IsDigit(currentTrimmed[0]))
+            if (currentTrimmed.Length > 0)
             {
-                var numEnd = 0;
-                while (numEnd < currentTrimmed.Length && char.IsDigit(currentTrimmed[numEnd]))
+                if (isOrdered && char.IsDigit(currentTrimmed[0]))
                 {
-                    numEnd++;
-                }
+                    var numEnd = 0;
+                    while (numEnd < currentTrimmed.Length && char.IsDigit(currentTrimmed[numEnd]))
+                    {
+                        numEnd++;
+                    }
 
-                if (numEnd < currentTrimmed.Length && (currentTrimmed[numEnd] == '.' || currentTrimmed[numEnd] == ')'))
+                    if (numEnd < currentTrimmed.Length && (currentTrimmed[numEnd] == '.' || currentTrimmed[numEnd] == ')'))
+                    {
+                        isListItem = true;
+                    }
+                }
+                else if (!isOrdered && (currentTrimmed[0] == '-' || currentTrimmed[0] == '*' || currentTrimmed[0] == '+'))
                 {
                     isListItem = true;
                 }
             }
-            else if (!isOrdered && (currentTrimmed[0] == '-' || currentTrimmed[0] == '*' || currentTrimmed[0] == '+'))
-            {
-                isListItem = true;
-            }
 
             if (isListItem && currentIndent == indent)
             {
+                // If we have blank lines before this item (and we already have items), mark as loose
+                if (blankLineCount > 0 && list.Children.Count > 0)
+                {
+                    hasBlankLineBetweenItems = true;
+                }
+
+                blankLineCount = 0; // Reset blank line counter
+
                 // New list item
                 var listItem = this.ParseListItem(currentLine, currentIndex, ref currentIndex);
                 if (listItem != null)
@@ -718,6 +737,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             else if (string.IsNullOrWhiteSpace(currentTrimmed))
             {
                 // Blank line - may continue list or end it
+                blankLineCount++;
                 currentIndex++;
             }
             else
@@ -726,6 +746,9 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                 break;
             }
         }
+
+        // Set IsLoose if we found blank lines between items
+        list.IsLoose = hasBlankLineBetweenItems;
 
         this._currentParent = savedParent;
 
@@ -781,8 +804,30 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             if (string.IsNullOrWhiteSpace(currentTrimmed))
             {
                 // Blank line - may be part of list item or end it
-                contentLines.Add(string.Empty);
-                currentIndex++;
+                // Look ahead to see if next line is indented (continuation)
+                if (currentIndex + 1 < this._lines!.Count)
+                {
+                    var nextLine = this._lines[currentIndex + 1];
+                    var nextTrimmed = nextLine.TrimStart();
+                    var nextIndent = nextLine.Length - nextTrimmed.Length;
+
+                    if (!string.IsNullOrWhiteSpace(nextTrimmed) && nextIndent > indent)
+                    {
+                        // Next line is indented - blank line is part of content
+                        contentLines.Add(string.Empty);
+                        currentIndex++;
+                    }
+                    else
+                    {
+                        // Blank line(s) between items - don't consume
+                        break;
+                    }
+                }
+                else
+                {
+                    // End of input - don't consume trailing blank
+                    break;
+                }
             }
             else if (currentIndent > indent)
             {
@@ -1035,54 +1080,203 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
     {
         htmlBlock = null;
 
-        // Simplified HTML block detection - CommonMark has 7 types
-        // For now, detect basic HTML tags
+        // CommonMark HTML blocks - 7 types per spec section 4.6-4.12
         var trimmed = line.TrimStart();
         if (!trimmed.StartsWith('<'))
         {
             return false;
         }
 
-        // Check for common HTML block tags (CommonMark HTML block types 1-7)
-        // Type 1-5: Specific tags that require closing tags
-        var htmlBlockTags = new[] { "script", "style", "pre", "iframe", "math", "svg", "div", "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "table", "thead", "tbody", "tr", "td", "th" };
-        foreach (var tag in htmlBlockTags)
+        var content = new StringBuilder();
+
+        // Type 1: <script, <style, <pre, <iframe (followed by whitespace, >, or EOL)
+        if (this.IsHtmlBlockType1Start(trimmed))
         {
-            if (trimmed.StartsWith($"<{tag}", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.StartsWith($"</{tag}", StringComparison.OrdinalIgnoreCase))
+            // Read until end tag found
+            var tagMatch = Regex.Match(trimmed, @"^<(script|style|pre|iframe)", RegexOptions.IgnoreCase);
+            var tagName = tagMatch.Groups[1].Value.ToLowerInvariant();
+
+            while (currentIndex < this._lines!.Count)
             {
-                // Parse until closing tag
-                var content = new StringBuilder();
-
-                while (currentIndex < this._lines!.Count)
+                var currentLine = this._lines[currentIndex];
+                if (content.Length > 0)
                 {
-                    var currentLine = this._lines[currentIndex];
-                    if (content.Length > 0)
-                    {
-                        _ = content.Append('\n');
-                    }
-
-                    _ = content.Append(currentLine);
-                    currentIndex++;
-
-                    // Check for closing tag
-                    if (currentLine.Contains($"</{tag}>", StringComparison.OrdinalIgnoreCase))
-                    {
-                        break;
-                    }
+                    _ = content.Append('\n');
                 }
 
-                htmlBlock = new HtmlBlockNode
-                {
-                    Content = content.ToString(),
-                    Location = new SourceLocation(0, content.Length, lineIndex + 1, 1)
-                };
+                _ = content.Append(currentLine);
+                currentIndex++;
 
-                return true;
+                if (currentLine.Contains($"</{tagName}>", StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
             }
+
+            htmlBlock = new HtmlBlockNode { Content = content.ToString(), Location = new SourceLocation(0, content.Length, lineIndex + 1, 1) };
+            return true;
+        }
+
+        // Type 2: HTML comment <!-- ... -->
+        if (trimmed.StartsWith("<!--"))
+        {
+            _ = content.Append(this._lines![currentIndex]);
+            currentIndex++;
+
+            // Find closing -->
+            while (currentIndex < this._lines!.Count)
+            {
+                var currentLine = this._lines[currentIndex];
+                _ = content.Append('\n').Append(currentLine);
+                currentIndex++;
+
+                if (currentLine.Contains("-->"))
+                {
+                    break;
+                }
+            }
+
+            htmlBlock = new HtmlBlockNode { Content = content.ToString(), Location = new SourceLocation(0, content.Length, lineIndex + 1, 1) };
+            return true;
+        }
+
+        // Type 3: Processing instruction <? ... ?>
+        if (trimmed.StartsWith("<?"))
+        {
+            _ = content.Append(this._lines![currentIndex]);
+            currentIndex++;
+
+            while (currentIndex < this._lines!.Count)
+            {
+                var currentLine = this._lines[currentIndex];
+                _ = content.Append('\n').Append(currentLine);
+                currentIndex++;
+
+                if (currentLine.Contains("?>"))
+                {
+                    break;
+                }
+            }
+
+            htmlBlock = new HtmlBlockNode { Content = content.ToString(), Location = new SourceLocation(0, content.Length, lineIndex + 1, 1) };
+            return true;
+        }
+
+        // Type 4: Declaration <! followed by uppercase ASCII letter
+        if (trimmed.StartsWith("<!") && trimmed.Length > 2 && char.IsUpper(trimmed[2]))
+        {
+            _ = content.Append(this._lines![currentIndex]);
+            currentIndex++;
+
+            while (currentIndex < this._lines!.Count)
+            {
+                var currentLine = this._lines[currentIndex];
+                _ = content.Append('\n').Append(currentLine);
+                currentIndex++;
+
+                if (currentLine.Contains('>'))
+                {
+                    break;
+                }
+            }
+
+            htmlBlock = new HtmlBlockNode { Content = content.ToString(), Location = new SourceLocation(0, content.Length, lineIndex + 1, 1) };
+            return true;
+        }
+
+        // Type 5: CDATA section <![CDATA[ ... ]]>
+        if (trimmed.StartsWith("<![CDATA["))
+        {
+            _ = content.Append(this._lines![currentIndex]);
+            currentIndex++;
+
+            while (currentIndex < this._lines!.Count)
+            {
+                var currentLine = this._lines[currentIndex];
+                _ = content.Append('\n').Append(currentLine);
+                currentIndex++;
+
+                if (currentLine.Contains("]]>"))
+                {
+                    break;
+                }
+            }
+
+            htmlBlock = new HtmlBlockNode { Content = content.ToString(), Location = new SourceLocation(0, content.Length, lineIndex + 1, 1) };
+            return true;
+        }
+
+        // Type 6: Start condition - opening tag or closing tag from predefined list
+        if (this.IsHtmlBlockType6Start(trimmed))
+        {
+            _ = content.Append(this._lines![currentIndex]);
+            currentIndex++;
+
+            // Read until blank line
+            while (currentIndex < this._lines!.Count)
+            {
+                var currentLine = this._lines[currentIndex];
+                if (string.IsNullOrWhiteSpace(currentLine))
+                {
+                    break;
+                }
+
+                _ = content.Append('\n').Append(currentLine);
+                currentIndex++;
+            }
+
+            htmlBlock = new HtmlBlockNode { Content = content.ToString(), Location = new SourceLocation(0, content.Length, lineIndex + 1, 1) };
+            return true;
+        }
+
+        // Type 7: Complete open tag or closing tag (any tag except script, pre, style)
+        if (this.IsHtmlBlockType7Start(trimmed))
+        {
+            _ = content.Append(this._lines![currentIndex]);
+            currentIndex++;
+
+            // Read until blank line
+            while (currentIndex < this._lines!.Count)
+            {
+                var currentLine = this._lines[currentIndex];
+                if (string.IsNullOrWhiteSpace(currentLine))
+                {
+                    break;
+                }
+
+                _ = content.Append('\n').Append(currentLine);
+                currentIndex++;
+            }
+
+            htmlBlock = new HtmlBlockNode { Content = content.ToString(), Location = new SourceLocation(0, content.Length, lineIndex + 1, 1) };
+            return true;
         }
 
         return false;
+    }
+
+    private bool IsHtmlBlockType1Start(string line)
+    {
+        // <script, <style, <pre, <iframe followed by whitespace, >, or EOL
+        var match = Regex.Match(line, @"^<(script|style|pre|iframe)(?:\s|>|$)", RegexOptions.IgnoreCase);
+        return match.Success;
+    }
+
+    private bool IsHtmlBlockType6Start(string line)
+    {
+        // Opening or closing tag from predefined list, followed by whitespace, >, or EOL
+        var tagList = new[] { "address", "article", "aside", "base", "basefont", "blockquote", "body", "caption", "center", "col", "colgroup", "dd", "details", "dialog", "dir", "div", "dl", "dt", "fieldset", "figcaption", "figure", "footer", "form", "frame", "frameset", "h1", "h2", "h3", "h4", "h5", "h6", "head", "header", "hr", "html", "legend", "li", "link", "main", "menu", "menuitem", "meta", "nav", "noframes", "ol", "optgroup", "option", "param", "section", "source", "summary", "table", "tbody", "td", "tfoot", "th", "thead", "title", "tr", "track", "ul" };
+
+        var match = Regex.Match(line, @"^</?(" + string.Join("|", tagList) + @")(?:\s|>|$)", RegexOptions.IgnoreCase);
+        return match.Success;
+    }
+
+    private bool IsHtmlBlockType7Start(string line)
+    {
+        // Complete open tag or closing tag (except script, pre, style) or self-closing tag, followed by whitespace or EOL
+        // Very permissive - matches any valid HTML tag-like structure
+        var match = Regex.Match(line, @"^</?\w+(?:\s|[^>]*)?/?>?\s*$");
+        return match.Success && !Regex.IsMatch(line, @"^<(script|pre|style)(?:\s|>|$)", RegexOptions.IgnoreCase);
     }
 
     private ParagraphNode? ParseParagraph(string line, int lineIndex, ref int currentIndex)
@@ -1370,6 +1564,175 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
 
                     i = closerPos + markerCount;
                     continue;
+                }
+            }
+
+            // Autolinks: <http://example.com> or <user@example.com>
+            if (text[i] == '<')
+            {
+                var closeIdx = text.IndexOf('>', i + 1);
+                if (closeIdx > i + 1)
+                {
+                    var content = text.Substring(i + 1, closeIdx - i - 1);
+
+                    // Check if it's a URL autolink
+                    if (content.Contains("://") && (content.StartsWith("http://") || content.StartsWith("https://") || content.StartsWith("ftp://")))
+                    {
+                        // Flush current text
+                        if (currentText.Length > 0)
+                        {
+                            result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                            _ = currentText.Clear();
+                        }
+
+                        // Create autolink
+                        var autolinkNode = new LinkNode { Url = content };
+                        autolinkNode.Children.Add(new MarkdownTextNode { Content = content });
+                        result.Add(autolinkNode);
+                        i = closeIdx + 1;
+                        continue;
+                    }
+
+                    // Check if it's an email autolink
+#pragma warning disable CA1847, CA1866
+                    if (content.Contains("@") && !content.StartsWith("@") && !content.EndsWith("@"))
+#pragma warning restore CA1847, CA1866
+                    {
+                        var atIdx = content.IndexOf('@');
+#pragma warning disable CA1846
+                        var beforeAt = content.Substring(0, atIdx);
+                        var afterAt = content.Substring(atIdx + 1);
+#pragma warning restore CA1846
+
+                        // Simple email validation: non-empty before and after @, with domain having a dot
+#pragma warning disable CA1847
+                        if (beforeAt.Length > 0 && afterAt.Length > 0 && afterAt.Contains("."))
+#pragma warning restore CA1847
+                        {
+                            // Flush current text
+                            if (currentText.Length > 0)
+                            {
+                                result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                                _ = currentText.Clear();
+                            }
+
+                            // Create email autolink
+                            var emailLink = new LinkNode { Url = "mailto:" + content };
+                            emailLink.Children.Add(new MarkdownTextNode { Content = content });
+                            result.Add(emailLink);
+                            i = closeIdx + 1;
+                            continue;
+                        }
+                    }
+
+                    // Check if it's raw HTML inline: <span>, <div>, etc.
+                    if (content.Length > 0 && (char.IsLetter(content[0]) || content[0] == '/' || content[0] == '!'))
+                    {
+                        // Simple HTML tag check: starts with letter or / or !
+                        var firstWord = content.Split(' ', '>', '/')[0];
+                        if (firstWord.Length > 0 && (char.IsLetter(firstWord[0]) || firstWord[0] == '/' || firstWord[0] == '!'))
+                        {
+                            // This looks like an HTML tag - preserve as raw HTML
+                            // Flush current text
+                            if (currentText.Length > 0)
+                            {
+                                result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                                _ = currentText.Clear();
+                            }
+
+                            // Create raw HTML node by reusing the paragraph content as-is
+                            // Since we don't have a specific RawHtmlNode, we'll create a special text node
+                            result.Add(new MarkdownTextNode { Content = text.Substring(i, closeIdx - i + 1) });
+                            i = closeIdx + 1;
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // HTML Entities: &amp; &#123; &#x1F600; etc.
+            if (text[i] == '&')
+            {
+                var semiIdx = text.IndexOf(';', i + 1);
+                if (semiIdx > i + 1 && semiIdx - i <= 32)  // Reasonable max length for entity
+                {
+                    var entityContent = text.Substring(i + 1, semiIdx - i - 1);
+
+                    // Named entity: &name;
+                    if (entityContent.Length > 0 && char.IsLetter(entityContent[0]))
+                    {
+                        // Check if it's a valid named entity
+                        var entityValue = this.ResolveNamedEntity(entityContent);
+                        if (entityValue != null)
+                        {
+                            // Flush current text
+                            if (currentText.Length > 0)
+                            {
+                                result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                                _ = currentText.Clear();
+                            }
+
+                            result.Add(new MarkdownTextNode { Content = entityValue });
+                            i = semiIdx + 1;
+                            continue;
+                        }
+                    }
+
+                    // Decimal entity: &#123;
+                    if (entityContent.StartsWith('#') && entityContent.Length > 1 && char.IsDigit(entityContent[1]))
+                    {
+#pragma warning disable CA1846
+                        if (int.TryParse(entityContent.Substring(1), out var codePoint) && codePoint >= 0 && codePoint <= 0x10FFFF)
+#pragma warning restore CA1846
+                        {
+                            // Flush current text
+                            if (currentText.Length > 0)
+                            {
+                                result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                                _ = currentText.Clear();
+                            }
+
+                            try
+                            {
+                                var entityChar = char.ConvertFromUtf32(codePoint);
+                                result.Add(new MarkdownTextNode { Content = entityChar });
+                                i = semiIdx + 1;
+                                continue;
+                            }
+                            catch
+                            {
+                                // Invalid code point
+                            }
+                        }
+                    }
+
+                    // Hex entity: &#x1F600;
+                    if (entityContent.StartsWith("#x", StringComparison.OrdinalIgnoreCase) && entityContent.Length > 2)
+                    {
+#pragma warning disable CA1846
+                        if (int.TryParse(entityContent.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out var hexCodePoint) && hexCodePoint >= 0 && hexCodePoint <= 0x10FFFF)
+#pragma warning restore CA1846
+                        {
+                            // Flush current text
+                            if (currentText.Length > 0)
+                            {
+                                result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                                _ = currentText.Clear();
+                            }
+
+                            try
+                            {
+                                var entityChar = char.ConvertFromUtf32(hexCodePoint);
+                                result.Add(new MarkdownTextNode { Content = entityChar });
+                                i = semiIdx + 1;
+                                continue;
+                            }
+                            catch
+                            {
+                                // Invalid code point
+                            }
+                        }
+                    }
                 }
             }
 
@@ -2048,6 +2411,265 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         }
 
         return -1;
+    }
+
+    private string? ResolveNamedEntity(string entityName)
+    {
+        // Common HTML entities per CommonMark spec
+        return entityName switch
+        {
+            "quot" => "\"",
+            "amp" => "&",
+            "lt" => "<",
+            "gt" => ">",
+            "apos" => "'",
+            "nbsp" => "\u00A0",
+            "iexcl" => "\u00A1",
+            "cent" => "\u00A2",
+            "pound" => "\u00A3",
+            "curren" => "\u00A4",
+            "yen" => "\u00A5",
+            "brvbar" => "\u00A6",
+            "sect" => "\u00A7",
+            "uml" => "\u00A8",
+            "copy" => "\u00A9",
+            "ordf" => "\u00AA",
+            "laquo" => "\u00AB",
+            "not" => "\u00AC",
+            "shy" => "\u00AD",
+            "reg" => "\u00AE",
+            "macr" => "\u00AF",
+            "deg" => "\u00B0",
+            "plusmn" => "\u00B1",
+            "sup2" => "\u00B2",
+            "sup3" => "\u00B3",
+            "acute" => "\u00B4",
+            "micro" => "\u00B5",
+            "para" => "\u00B6",
+            "middot" => "\u00B7",
+            "cedil" => "\u00B8",
+            "sup1" => "\u00B9",
+            "ordm" => "\u00BA",
+            "raquo" => "\u00BB",
+            "frac14" => "\u00BC",
+            "frac12" => "\u00BD",
+            "frac34" => "\u00BE",
+            "iquest" => "\u00BF",
+            "Agrave" => "\u00C0",
+            "Aacute" => "\u00C1",
+            "Acirc" => "\u00C2",
+            "Atilde" => "\u00C3",
+            "Auml" => "\u00C4",
+            "Aring" => "\u00C5",
+            "AElig" => "\u00C6",
+            "Ccedil" => "\u00C7",
+            "Egrave" => "\u00C8",
+            "Eacute" => "\u00C9",
+            "Ecirc" => "\u00CA",
+            "Euml" => "\u00CB",
+            "Igrave" => "\u00CC",
+            "Iacute" => "\u00CD",
+            "Icirc" => "\u00CE",
+            "Iuml" => "\u00CF",
+            "ETH" => "\u00D0",
+            "Ntilde" => "\u00D1",
+            "Ograve" => "\u00D2",
+            "Oacute" => "\u00D3",
+            "Ocirc" => "\u00D4",
+            "Otilde" => "\u00D5",
+            "Ouml" => "\u00D6",
+            "times" => "\u00D7",
+            "Oslash" => "\u00D8",
+            "Ugrave" => "\u00D9",
+            "Uacute" => "\u00DA",
+            "Ucirc" => "\u00DB",
+            "Uuml" => "\u00DC",
+            "Yacute" => "\u00DD",
+            "THORN" => "\u00DE",
+            "szlig" => "\u00DF",
+            "agrave" => "\u00E0",
+            "aacute" => "\u00E1",
+            "acirc" => "\u00E2",
+            "atilde" => "\u00E3",
+            "auml" => "\u00E4",
+            "aring" => "\u00E5",
+            "aelig" => "\u00E6",
+            "ccedil" => "\u00E7",
+            "egrave" => "\u00E8",
+            "eacute" => "\u00E9",
+            "ecirc" => "\u00EA",
+            "euml" => "\u00EB",
+            "igrave" => "\u00EC",
+            "iacute" => "\u00ED",
+            "icirc" => "\u00EE",
+            "iuml" => "\u00EF",
+            "eth" => "\u00F0",
+            "ntilde" => "\u00F1",
+            "ograve" => "\u00F2",
+            "oacute" => "\u00F3",
+            "ocirc" => "\u00F4",
+            "otilde" => "\u00F5",
+            "ouml" => "\u00F6",
+            "divide" => "\u00F7",
+            "oslash" => "\u00F8",
+            "ugrave" => "\u00F9",
+            "uacute" => "\u00FA",
+            "ucirc" => "\u00FB",
+            "uuml" => "\u00FC",
+            "yacute" => "\u00FD",
+            "thorn" => "\u00FE",
+            "yuml" => "\u00FF",
+            "OElig" => "\u0152",
+            "oelig" => "\u0153",
+            "Scaron" => "\u0160",
+            "scaron" => "\u0161",
+            "Yuml" => "\u0178",
+            "fnof" => "\u0192",
+            "circ" => "\u02C6",
+            "tilde" => "\u02DC",
+            "Alpha" => "\u0391",
+            "Beta" => "\u0392",
+            "Gamma" => "\u0393",
+            "Delta" => "\u0394",
+            "Epsilon" => "\u0395",
+            "Zeta" => "\u0396",
+            "Eta" => "\u0397",
+            "Theta" => "\u0398",
+            "Iota" => "\u0399",
+            "Kappa" => "\u039A",
+            "Lambda" => "\u039B",
+            "Mu" => "\u039C",
+            "Nu" => "\u039D",
+            "Xi" => "\u039E",
+            "Omicron" => "\u039F",
+            "Pi" => "\u03A0",
+            "Rho" => "\u03A1",
+            "Sigma" => "\u03A3",
+            "Tau" => "\u03A4",
+            "Upsilon" => "\u03A5",
+            "Phi" => "\u03A6",
+            "Chi" => "\u03A7",
+            "Psi" => "\u03A8",
+            "Omega" => "\u03A9",
+            "alpha" => "\u03B1",
+            "beta" => "\u03B2",
+            "gamma" => "\u03B3",
+            "delta" => "\u03B4",
+            "epsilon" => "\u03B5",
+            "zeta" => "\u03B6",
+            "eta" => "\u03B7",
+            "theta" => "\u03B8",
+            "iota" => "\u03B9",
+            "kappa" => "\u03BA",
+            "lambda" => "\u03BB",
+            "mu" => "\u03BC",
+            "nu" => "\u03BD",
+            "xi" => "\u03BE",
+            "omicron" => "\u03BF",
+            "pi" => "\u03C0",
+            "rho" => "\u03C1",
+            "sigmaf" => "\u03C2",
+            "sigma" => "\u03C3",
+            "tau" => "\u03C4",
+            "upsilon" => "\u03C5",
+            "phi" => "\u03C6",
+            "chi" => "\u03C7",
+            "psi" => "\u03C8",
+            "omega" => "\u03C9",
+            "thetasym" => "\u03D1",
+            "upsih" => "\u03D2",
+            "piv" => "\u03D6",
+            "ensp" => "\u2002",
+            "emsp" => "\u2003",
+            "thinsp" => "\u2009",
+            "zwnj" => "\u200C",
+            "zwj" => "\u200D",
+            "lrm" => "\u200E",
+            "rlm" => "\u200F",
+            "ndash" => "\u2013",
+            "mdash" => "\u2014",
+            "lsquo" => "\u2018",
+            "rsquo" => "\u2019",
+            "sbquo" => "\u201A",
+            "ldquo" => "\u201C",
+            "rdquo" => "\u201D",
+            "bdquo" => "\u201E",
+            "dagger" => "\u2020",
+            "Dagger" => "\u2021",
+            "bull" => "\u2022",
+            "hellip" => "\u2026",
+            "permil" => "\u2030",
+            "prime" => "\u2032",
+            "Prime" => "\u2033",
+            "lsaquo" => "\u2039",
+            "rsaquo" => "\u203A",
+            "oline" => "\u203E",
+            "frasl" => "\u2044",
+            "weierp" => "\u2118",
+            "image" => "\u2111",
+            "real" => "\u211C",
+            "trade" => "\u2122",
+            "alefsym" => "\u2135",
+            "larr" => "\u2190",
+            "uarr" => "\u2191",
+            "rarr" => "\u2192",
+            "darr" => "\u2193",
+            "harr" => "\u2194",
+            "crarr" => "\u21B5",
+            "lArr" => "\u21D0",
+            "uArr" => "\u21D1",
+            "rArr" => "\u21D2",
+            "dArr" => "\u21D3",
+            "hArr" => "\u21D4",
+            "forall" => "\u2200",
+            "part" => "\u2202",
+            "exist" => "\u2203",
+            "empty" => "\u2205",
+            "nabla" => "\u2207",
+            "isin" => "\u2208",
+            "notin" => "\u2209",
+            "ni" => "\u220B",
+            "prod" => "\u220F",
+            "sum" => "\u2211",
+            "minus" => "\u2212",
+            "lowast" => "\u2217",
+            "radic" => "\u221A",
+            "prop" => "\u221D",
+            "infin" => "\u221E",
+            "ang" => "\u2220",
+            "and" => "\u2227",
+            "or" => "\u2228",
+            "cap" => "\u2229",
+            "cup" => "\u222A",
+            "int" => "\u222B",
+            "there4" => "\u2234",
+            "sim" => "\u223C",
+            "cong" => "\u2245",
+            "asymp" => "\u2248",
+            "ne" => "\u2260",
+            "equiv" => "\u2261",
+            "le" => "\u2264",
+            "ge" => "\u2265",
+            "sub" => "\u2282",
+            "sup" => "\u2283",
+            "nsub" => "\u2284",
+            "sube" => "\u2286",
+            "supe" => "\u2287",
+            "oplus" => "\u2295",
+            "otimes" => "\u2297",
+            "perp" => "\u22A5",
+            "sdot" => "\u22C5",
+            "lceil" => "\u2308",
+            "rceil" => "\u2309",
+            "lfloor" => "\u230A",
+            "rfloor" => "\u230B",
+            "loz" => "\u25CA",
+            "spades" => "\u2660",
+            "clubs" => "\u2663",
+            "hearts" => "\u2665",
+            "diams" => "\u2666",
+            _ => null
+        };
     }
 
     #endregion
