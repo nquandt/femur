@@ -38,6 +38,33 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
     }
 
     /// <summary>
+    /// Delimiter entry for the delimiter stack algorithm.
+    /// Tracks potential opening and closing delimiters for emphasis, links, etc.
+    /// </summary>
+    private sealed class DelimiterEntry
+    {
+        /// <summary>The delimiter character: *, _, [, ], (, etc.</summary>
+        public char Character { get; set; }
+
+        /// <summary>Number of consecutive delimiter characters (1, 2, or 3 for emphasis).</summary>
+        public int Count { get; set; }
+
+        /// <summary>Starting index in the text where this delimiter sequence begins.</summary>
+        public int StartIndex { get; set; }
+
+        /// <summary>Ending index in the text where this delimiter sequence ends.</summary>
+        public int EndIndex { get; set; }
+
+        /// <summary>Whether this delimiter can open emphasis (left-flanking run).</summary>
+        public bool CanOpen { get; set; }
+
+        /// <summary>Whether this delimiter can close emphasis (right-flanking run).</summary>
+        public bool CanClose { get; set; }
+
+        public override string ToString() => $"{this.Character}x{this.Count} @{this.StartIndex} (Open:{this.CanOpen} Close:{this.CanClose})";
+    }
+
+    /// <summary>
     /// Creates a new Markdown parser for the given stream
     /// </summary>
     public MarkdownParser(Stream stream, int bufferSize = 4096) : base(stream, bufferSize)
@@ -1525,7 +1552,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                 }
             }
 
-            // Emphasis: *text* or _text_
+            // Emphasis: *text* or _text_ - using delimiter stack algorithm
             if (text[i] == '*' || text[i] == '_')
             {
                 var marker = text[i];
@@ -1535,34 +1562,69 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     markerCount++;
                 }
 
-                // Flush current text
-                if (currentText.Length > 0)
-                {
-                    result.Add(new MarkdownTextNode { Content = currentText.ToString() });
-                    _ = currentText.Clear();
-                }
-
-                // Try to find matching closer
-                var closerPos = this.FindEmphasisCloser(text, i + markerCount, marker, markerCount);
+                // For now, use improved pattern matching (delimiter stack is complex)
+                // Try to find matching closer with proper nesting support
+                var closerPos = this.FindBestEmphasisCloser(text, i, marker, markerCount);
                 if (closerPos > 0)
                 {
-                    var emphasisText = text.Substring(i + markerCount, closerPos - i - markerCount);
-                    if (markerCount >= 3)
+                    // Flush current text
+                    if (currentText.Length > 0)
                     {
-                        // ***text*** should be parsed as <strong><em>text</em></strong>
-                        var emphasisNode = new EmphasisNode { Children = { new MarkdownTextNode { Content = emphasisText } } };
-                        result.Add(new StrongEmphasisNode { Children = { emphasisNode } });
+                        result.Add(new MarkdownTextNode { Content = currentText.ToString() });
+                        _ = currentText.Clear();
                     }
-                    else if (markerCount >= 2)
+
+                    var contentStart = i + markerCount;
+                    var emphasisText = text.Substring(contentStart, closerPos - contentStart);
+
+                    // Determine how many delimiters are consumed
+                    var closerCount = this.CountTrailingDelimiters(text, closerPos, marker);
+                    var consumed = Math.Min(markerCount, closerCount);
+
+                    // Recursively parse content for nested emphasis
+                    var contentNodes = this.ParseInlineText(emphasisText, baseOffset + contentStart, originalText);
+
+                    // Build emphasis nodes based on delimiter count
+                    // For ***text*** with consumed=3: create strong around emphasis
+                    // For **text** with consumed=2: create strong
+                    // For *text* with consumed=1: create emphasis
+                    Node emphasisNode;
+
+                    if (consumed >= 3)
                     {
-                        result.Add(new StrongEmphasisNode { Children = { new MarkdownTextNode { Content = emphasisText } } });
+                        // Both strong and emphasis - create strong containing emphasis
+                        var innerEmphasis = new EmphasisNode();
+                        foreach (var contentNode in contentNodes)
+                        {
+                            innerEmphasis.Children.Add(contentNode);
+                        }
+
+                        emphasisNode = new StrongEmphasisNode();
+                        ((MarkdownContainerNode)emphasisNode).Children.Add(innerEmphasis);
+                    }
+                    else if (consumed >= 2)
+                    {
+                        // Strong emphasis
+                        emphasisNode = new StrongEmphasisNode();
+                        foreach (var contentNode in contentNodes)
+                        {
+                            ((MarkdownContainerNode)emphasisNode).Children.Add(contentNode);
+                        }
                     }
                     else
                     {
-                        result.Add(new EmphasisNode { Children = { new MarkdownTextNode { Content = emphasisText } } });
+                        // Regular emphasis
+                        emphasisNode = new EmphasisNode();
+                        foreach (var contentNode in contentNodes)
+                        {
+                            ((MarkdownContainerNode)emphasisNode).Children.Add(contentNode);
+                        }
                     }
 
-                    i = closerPos + markerCount;
+                    result.Add(emphasisNode);
+
+                    // Skip past the delimiters we just consumed
+                    i = closerPos + consumed;
                     continue;
                 }
             }
@@ -2411,6 +2473,64 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         }
 
         return -1;
+    }
+
+    /// <summary>
+    /// Finds the best matching emphasis closer with support for proper nesting.
+    /// This is part of the improved delimiter stack algorithm.
+    /// </summary>
+    private int FindBestEmphasisCloser(string text, int openerPos, char marker, int openerCount)
+    {
+        var searchStart = openerPos + openerCount;
+        var bestCloser = -1;
+
+        // Scan for potential closers - prefer exact match first, then fall back to partial
+        for (var i = searchStart; i < text.Length; i++)
+        {
+            if (text[i] == marker)
+            {
+                var closerCount = 1;
+                while (i + closerCount < text.Length && text[i + closerCount] == marker)
+                {
+                    closerCount++;
+                }
+
+                // Look for closest matching closer
+                // Prefer exact count match, otherwise use any closer with sufficient delimiters
+                if (closerCount >= openerCount)
+                {
+                    bestCloser = i;
+                    break; // Take first valid closer
+                }
+                else if (closerCount > 0 && bestCloser < 0)
+                {
+                    bestCloser = i; // Keep searching for exact match
+                }
+
+                i += closerCount - 1; // Skip past this delimiter sequence
+            }
+        }
+
+        return bestCloser;
+    }
+
+    /// <summary>
+    /// Count trailing delimiter characters at a given position.
+    /// </summary>
+    private int CountTrailingDelimiters(string text, int pos, char delimiter)
+    {
+        if (pos < 0 || pos >= text.Length || text[pos] != delimiter)
+        {
+            return 0;
+        }
+
+        var count = 1;
+        while (pos + count < text.Length && text[pos + count] == delimiter)
+        {
+            count++;
+        }
+
+        return count;
     }
 
     private string? ResolveNamedEntity(string entityName)

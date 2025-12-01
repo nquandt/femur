@@ -125,5 +125,155 @@ public class InlineParsingTests : IClassFixture<TestFixture>, IDisposable
     }
 
     #endregion
-}
 
+    #region Delimiter Stack - Complex Emphasis Nesting
+
+    [Fact]
+    public void Parse_TripleEmphasis_RendersAsStrongWithEmphasis()
+    {
+        // ***text*** should parse as <strong><em>text</em></strong>
+        var markdown = "***bold and italic***";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var outer = Assert.IsType<StrongEmphasisNode>(paragraph.Children[0]);
+        
+        // Should contain emphasis node
+        var inner = Assert.IsType<EmphasisNode>(outer.Children[0]);
+        Assert.NotEmpty(inner.Children);
+    }
+
+    [Fact]
+    public void Parse_TripleUnderscores_RendersAsStrongWithEmphasis()
+    {
+        // ___text___ should parse as <strong><em>text</em></strong>
+        var markdown = "___bold and italic___";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var outer = Assert.IsType<StrongEmphasisNode>(paragraph.Children[0]);
+        var inner = Assert.IsType<EmphasisNode>(outer.Children[0]);
+        Assert.NotEmpty(inner.Children);
+    }
+
+    [Fact]
+    public void Parse_NestedEmphasisBothMarkers_ParsesCorrectly()
+    {
+        // **foo *bar* baz** - strong containing mixed text and emphasis
+        var markdown = "**foo *bar* baz**";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var strong = Assert.IsType<StrongEmphasisNode>(paragraph.Children[0]);
+        
+        // Should contain multiple children: text "foo ", emphasis with "bar", text " baz"
+        Assert.True(strong.Children.Count >= 3);
+    }
+
+    [Fact]
+    public void Parse_NestedEmphasisReverse_ParsesCorrectly()
+    {
+        // *foo **bar** baz* - can't mix *, need to use _ with *
+        // So test: *foo **bar** baz* should at least parse the outer emphasis
+        var markdown = "*foo **bar** baz*";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var emphasis = Assert.IsType<EmphasisNode>(paragraph.Children[0]);
+        
+        // Should have content inside emphasis
+        Assert.NotEmpty(emphasis.Children);
+    }
+
+    [Fact]
+    public void Parse_MultipleEmphasisSameText_ParsesCorrectly()
+    {
+        // This is *emphasized* and **strong** text.
+        var markdown = "This is *emphasized* and **strong** text.";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        
+        // Should have: text, emphasis, text, strong, text
+        var hasEmphasis = paragraph.Children.OfType<EmphasisNode>().Any();
+        var hasStrong = paragraph.Children.OfType<StrongEmphasisNode>().Any();
+        
+        Assert.True(hasEmphasis);
+        Assert.True(hasStrong);
+    }
+
+    [Fact]
+    public void Parse_EmphasisWithCode_ParsesCorrectly()
+    {
+        // *emphasis with `code` inside*
+        var markdown = "*emphasis with `code` inside*";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var emphasis = Assert.IsType<EmphasisNode>(paragraph.Children[0]);
+        
+        // Should have text, code span, and text inside
+        var hasCodeSpan = emphasis.Children.OfType<CodeSpanNode>().Any();
+        Assert.True(hasCodeSpan);
+    }
+
+    [Fact]
+    public void Parse_StrongWithEmphasis_ParsesCorrectly()
+    {
+        // **strong with *emphasis* inside**
+        var markdown = "**strong with *emphasis* inside**";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var strong = Assert.IsType<StrongEmphasisNode>(paragraph.Children[0]);
+        
+        // Should contain emphasis node
+        var hasEmphasis = strong.Children.OfType<EmphasisNode>().Any();
+        Assert.True(hasEmphasis);
+    }
+
+    [Fact]
+    public void Parse_EmphasisAtBoundaries_ParsesCorrectly()
+    {
+        // *start* middle **end**
+        var markdown = "*start* middle **end**";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var emphasis = paragraph.Children.OfType<EmphasisNode>().FirstOrDefault();
+        var strong = paragraph.Children.OfType<StrongEmphasisNode>().FirstOrDefault();
+        
+        Assert.NotNull(emphasis);
+        Assert.NotNull(strong);
+    }
+
+    [Fact]
+    public void Parse_MixedMarkers_StarAndUnderscore_ParsesCorrectly()
+    {
+        // *emphasis with __strong__ inside*
+        var markdown = "*emphasis with __strong__ inside*";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var emphasis = Assert.IsType<EmphasisNode>(paragraph.Children[0]);
+        
+        var hasStrong = emphasis.Children.OfType<StrongEmphasisNode>().Any();
+        Assert.True(hasStrong);
+    }
+
+    [Fact]
+    public void Parse_DeeplyNestedEmphasis_ParsesCorrectly()
+    {
+        // **outer *middle __inner__ middle* outer**
+        var markdown = "**outer *middle __inner__ middle* outer**";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var outer = Assert.IsType<StrongEmphasisNode>(paragraph.Children[0]);
+        
+        // Should have children
+        Assert.NotEmpty(outer.Children);
+    }
+
+    #endregion
+}
