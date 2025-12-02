@@ -63,6 +63,11 @@
     <Project Path="src/Html/Parser/src/Femur.Html.Parser.csproj" />
   </Folder>
 
+  <Folder Name="/src/Chtml/Parser/src/">
+    <Project Path="src/Chtml/Parser/src/Femur.Chtml.Parser.csproj" />
+  </Folder>
+
+
   <Folder Name="/src/Xml/Abstractions/src/">
     <Project Path="src/Xml/Abstractions/src/Femur.Xml.Abstractions.csproj" />
   </Folder>
@@ -90,6 +95,11 @@
   <Folder Name="/src/Html/tests/">
     <Project Path="src/Html/tests/HtmlParserTests/HtmlParserTests.csproj" />
     <Project Path="src/Html/tests/HtmlParserTests.NetStandard20/HtmlParserTests.NetStandard20.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Chtml/Parser/tests/">
+    <Project Path="src/Chtml/Parser/tests/ChtmlParserTests/ChtmlParserTests.csproj" />
+    <Project Path="src/Chtml/Parser/tests/ChtmlParserTests.NetStandard20/ChtmlParserTests.NetStandard20.csproj" />
   </Folder>
 
   <Folder Name="/src/Xml/tests/">

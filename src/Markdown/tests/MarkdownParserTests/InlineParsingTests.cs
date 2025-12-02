@@ -137,7 +137,7 @@ public class InlineParsingTests : IClassFixture<TestFixture>, IDisposable
 
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         var outer = Assert.IsType<StrongEmphasisNode>(paragraph.Children[0]);
-        
+
         // Should contain emphasis node
         var inner = Assert.IsType<EmphasisNode>(outer.Children[0]);
         Assert.NotEmpty(inner.Children);
@@ -165,7 +165,7 @@ public class InlineParsingTests : IClassFixture<TestFixture>, IDisposable
 
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         var strong = Assert.IsType<StrongEmphasisNode>(paragraph.Children[0]);
-        
+
         // Should contain multiple children: text "foo ", emphasis with "bar", text " baz"
         Assert.True(strong.Children.Count >= 3);
     }
@@ -180,7 +180,7 @@ public class InlineParsingTests : IClassFixture<TestFixture>, IDisposable
 
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         var emphasis = Assert.IsType<EmphasisNode>(paragraph.Children[0]);
-        
+
         // Should have content inside emphasis
         Assert.NotEmpty(emphasis.Children);
     }
@@ -193,11 +193,11 @@ public class InlineParsingTests : IClassFixture<TestFixture>, IDisposable
         var result = MarkdownParserInstance.Parse(markdown);
 
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
-        
+
         // Should have: text, emphasis, text, strong, text
         var hasEmphasis = paragraph.Children.OfType<EmphasisNode>().Any();
         var hasStrong = paragraph.Children.OfType<StrongEmphasisNode>().Any();
-        
+
         Assert.True(hasEmphasis);
         Assert.True(hasStrong);
     }
@@ -211,7 +211,7 @@ public class InlineParsingTests : IClassFixture<TestFixture>, IDisposable
 
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         var emphasis = Assert.IsType<EmphasisNode>(paragraph.Children[0]);
-        
+
         // Should have text, code span, and text inside
         var hasCodeSpan = emphasis.Children.OfType<CodeSpanNode>().Any();
         Assert.True(hasCodeSpan);
@@ -226,7 +226,7 @@ public class InlineParsingTests : IClassFixture<TestFixture>, IDisposable
 
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         var strong = Assert.IsType<StrongEmphasisNode>(paragraph.Children[0]);
-        
+
         // Should contain emphasis node
         var hasEmphasis = strong.Children.OfType<EmphasisNode>().Any();
         Assert.True(hasEmphasis);
@@ -242,7 +242,7 @@ public class InlineParsingTests : IClassFixture<TestFixture>, IDisposable
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         var emphasis = paragraph.Children.OfType<EmphasisNode>().FirstOrDefault();
         var strong = paragraph.Children.OfType<StrongEmphasisNode>().FirstOrDefault();
-        
+
         Assert.NotNull(emphasis);
         Assert.NotNull(strong);
     }
@@ -256,7 +256,7 @@ public class InlineParsingTests : IClassFixture<TestFixture>, IDisposable
 
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         var emphasis = Assert.IsType<EmphasisNode>(paragraph.Children[0]);
-        
+
         var hasStrong = emphasis.Children.OfType<StrongEmphasisNode>().Any();
         Assert.True(hasStrong);
     }
@@ -270,7 +270,7 @@ public class InlineParsingTests : IClassFixture<TestFixture>, IDisposable
 
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         var outer = Assert.IsType<StrongEmphasisNode>(paragraph.Children[0]);
-        
+
         // Should have children
         Assert.NotEmpty(outer.Children);
     }

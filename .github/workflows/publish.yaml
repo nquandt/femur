@@ -32,6 +32,8 @@ jobs:
         dotnet pack ./src/Markdown/Abstractions/src/Femur.Markdown.Abstractions.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Markdown/Parser/src/Femur.Markdown.Parser.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Markdown/Renderer/src/Femur.Markdown.Renderer.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
+        dotnet pack ./src/Markdown/Extended/Abstractions/src/Femur.Markdown.Extended.Abstractions.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
+        dotnet pack ./src/Markdown/Extended/Parser/src/Femur.Markdown.Extended.Parser.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Markup.Abstractions/src/Femur.Markup.Abstractions.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Parsing/src/Femur.Parsing.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Serialization/src/Femur.Serialization.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
@@ -50,6 +52,8 @@ jobs:
         dotnet nuget push ./artifacts/Femur.Markdown.Abstractions.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Markdown.Parser.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Markdown.Renderer.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+        dotnet nuget push ./artifacts/Femur.Markdown.Extended.Abstractions.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+        dotnet nuget push ./artifacts/Femur.Markdown.Extended.Parser.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Markup.Abstractions.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Parsing.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Serialization.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
