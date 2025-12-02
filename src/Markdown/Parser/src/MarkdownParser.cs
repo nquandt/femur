@@ -432,6 +432,10 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                 this.AddBlock(heading);
                 i++;
             }
+            else if (this.TryParseFencedDiv(trimmed, i, ref i, out var fencedDiv) && fencedDiv != null)
+            {
+                this.AddBlock(fencedDiv);
+            }
             else if (this.TryParseFencedCodeBlock(trimmed, i, ref i, out var codeBlock) && codeBlock != null)
             {
                 this.AddBlock(codeBlock);
@@ -703,6 +707,305 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         };
 
         return true;
+    }
+
+    /// <summary>
+    /// Attempts to parse a fenced div (container block delimited by ::: markers).
+    /// Implements the Pandoc fenced_divs extension.
+    /// </summary>
+    private bool TryParseFencedDiv(string line, int lineIndex, ref int currentIndex, out FencedDivNode? fencedDiv)
+    {
+        fencedDiv = null;
+
+        // Check for opening fence: ::: with at least 3 colons followed by attributes
+        if (line.Length == 0 || line[0] != ':')
+        {
+            return false;
+        }
+
+        // Count leading colons
+        var fenceLength = 0;
+        while (fenceLength < line.Length && line[fenceLength] == ':')
+        {
+            fenceLength++;
+        }
+
+        if (fenceLength < 3)
+        {
+            return false;
+        }
+
+        // Extract everything after the opening colons
+        var rest = line.Substring(fenceLength).TrimStart();
+
+        // Check if this is a closing fence (no content after colons)
+        if (string.IsNullOrWhiteSpace(rest))
+        {
+            return false;
+        }
+
+        // Parse name and attributes
+        // Format can be:
+        // - :::name {attributes} - named div with attributes
+        // - :::name - named div without attributes
+        // - ::: {attributes} - unnamed div with attributes (original Pandoc format)
+        string? name = null;
+        var attributes = string.Empty;
+
+        // Check if rest starts with '{' (attributes without name)
+        if (rest.StartsWith('{'))
+        {
+            // Unnamed div with attributes: ::: {attributes}
+            attributes = rest.Trim();
+        }
+        else
+        {
+            // Check if there's a name followed by attributes
+            var spaceIndex = rest.IndexOf(' ');
+            if (spaceIndex > 0)
+            {
+                // Has space - check if next part is attributes
+                name = rest.Substring(0, spaceIndex).Trim();
+                var afterSpace = rest.Substring(spaceIndex).TrimStart();
+
+                if (afterSpace.StartsWith('{'))
+                {
+                    // Named div with attributes: :::name {attributes}
+                    attributes = afterSpace.Trim();
+                }
+                else
+                {
+                    // Name with space but no attributes - treat name as including the space content
+                    // This handles cases like :::name content (no attributes)
+                    name = rest.Trim();
+                    attributes = string.Empty;
+                }
+            }
+            else
+            {
+                // No space - could be just name or name with no attributes
+                // Check if it looks like attributes (starts with {)
+                if (rest.StartsWith('{'))
+                {
+                    attributes = rest.Trim();
+                }
+                else
+                {
+                    // Named div without attributes: :::name
+                    name = rest.Trim();
+                    attributes = string.Empty;
+                }
+            }
+        }
+
+        // For backward compatibility, allow unnamed divs without attributes only if they have attributes
+        // But named divs can exist without attributes
+        if (string.IsNullOrEmpty(name) && string.IsNullOrWhiteSpace(attributes))
+        {
+            return false;
+        }
+
+        // Read div content until closing fence
+        // Track nesting depth to handle nested fenced divs correctly
+        var divContent = new List<string>();
+        currentIndex++;
+        var closingFenceFound = false;
+        var nestingDepth = 0;
+
+        while (currentIndex < this._lines!.Count)
+        {
+            var currentLine = this._lines[currentIndex];
+            var trimmedLine = currentLine.Trim();
+
+            // Check for fenced div markers (opening or closing)
+            if (trimmedLine.Length > 0 && trimmedLine[0] == ':')
+            {
+                var colonCount = 0;
+                while (colonCount < trimmedLine.Length && trimmedLine[colonCount] == ':')
+                {
+                    colonCount++;
+                }
+
+                if (colonCount >= 3)
+                {
+                    // Check what comes after the colons
+                    var afterColons = trimmedLine.Substring(colonCount).Trim();
+
+                    // Check if this is an opening fence (has attributes or name)
+                    // Opening fence can be:
+                    // - :::name {attributes}
+                    // - :::name
+                    // - ::: {attributes}
+                    if (!string.IsNullOrEmpty(afterColons) && !afterColons.All(c => c == ':'))
+                    {
+                        // Check if it's an opening fence (has name or attributes starting with {)
+                        var isOpeningFence = afterColons.StartsWith('{') ||
+                                             (!string.IsNullOrWhiteSpace(afterColons) && !afterColons.Trim().StartsWith('{') && afterColons.IndexOf(' ') < 0);
+
+                        // More precise check: if it doesn't start with {, check if it has a space followed by {
+                        if (!isOpeningFence && afterColons.Contains(' '))
+                        {
+                            var spaceIdx = afterColons.IndexOf(' ');
+                            var afterSpace = afterColons.Substring(spaceIdx).TrimStart();
+                            isOpeningFence = afterSpace.StartsWith('{');
+                        }
+
+                        if (isOpeningFence)
+                        {
+                            // This is a nested opening fence - increase nesting depth
+                            nestingDepth++;
+                            divContent.Add(currentLine);
+                            currentIndex++;
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        // This is a closing fence
+                        if (nestingDepth > 0)
+                        {
+                            // This closes a nested div, not the outer one
+                            nestingDepth--;
+                            divContent.Add(currentLine);
+                            currentIndex++;
+                            continue;
+                        }
+                        else
+                        {
+                            // This closes the outer div
+                            closingFenceFound = true;
+                            currentIndex++;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            divContent.Add(currentLine);
+            currentIndex++;
+        }
+
+        // Only treat as valid fenced div if we found a closing fence
+        if (!closingFenceFound)
+        {
+            // Reset and treat as regular content
+            currentIndex = lineIndex + 1;
+            return false;
+        }
+
+        // Parse the div content recursively (it can contain any blocks)
+        var contentStr = string.Join("\n", divContent);
+        var parser = new MarkdownParser(new MemoryStream(Encoding.UTF8.GetBytes(contentStr)));
+        var contentDoc = parser.Parse();
+
+        fencedDiv = new FencedDivNode
+        {
+            Tag = name,
+            Attributes = attributes,
+            OpeningFenceLength = fenceLength,
+            Location = new SourceLocation(0, divContent.Count, lineIndex + 1, 1)
+        };
+
+        // Copy parsed content from the temporary document to the fenced div
+        if (contentDoc.HasChildren)
+        {
+            foreach (var child in contentDoc.Children)
+            {
+                child.Parent = fencedDiv;
+                fencedDiv.Children.Add(child);
+            }
+        }
+
+        // Parse attributes
+        fencedDiv.ParsedAttributes = this.ParseDivAttributes(attributes);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Parses fenced div attributes in Pandoc format: {#id .class1 .class2 key=value}
+    /// </summary>
+    private FencedDivAttributes ParseDivAttributes(string attributeString)
+    {
+        var result = new FencedDivAttributes();
+
+        if (string.IsNullOrWhiteSpace(attributeString))
+        {
+            return result;
+        }
+
+        // Remove outer braces if present
+        var attrs = attributeString.Trim();
+        if (attrs.Length > 0 && attrs[0] == '{' && attrs[attrs.Length - 1] == '}')
+        {
+            attrs = attrs.Substring(1, attrs.Length - 2).Trim();
+        }
+
+        // Simple tokenization: split by spaces outside of quotes
+        var tokens = new List<string>();
+        var current = new StringBuilder();
+        var inQuotes = false;
+
+        foreach (var ch in attrs)
+        {
+            if (ch == '"')
+            {
+                inQuotes = !inQuotes;
+                current.Append(ch);
+            }
+            else if (ch == ' ' && !inQuotes)
+            {
+                if (current.Length > 0)
+                {
+                    tokens.Add(current.ToString());
+                    current.Clear();
+                }
+            }
+            else
+            {
+                current.Append(ch);
+            }
+        }
+
+        if (current.Length > 0)
+        {
+            tokens.Add(current.ToString());
+        }
+
+        // Parse tokens
+        foreach (var token in tokens)
+        {
+            if (token.StartsWith('#'))
+            {
+                // ID
+                result.Id = token.Substring(1);
+            }
+            else if (token.StartsWith('.'))
+            {
+                // Class
+                result.Classes.Add(token.Substring(1));
+            }
+            else if (token.Contains('='))
+            {
+                // Key=value attribute
+                var equalsIndex = token.IndexOf('=');
+                if (equalsIndex > 0)
+                {
+                    var key = token.Substring(0, equalsIndex);
+                    var value = token.Substring(equalsIndex + 1);
+
+                    // Remove surrounding quotes if present
+                    if (value.Length >= 2 && value[0] == '"' && value[value.Length - 1] == '"')
+                    {
+                        value = value.Substring(1, value.Length - 2);
+                    }
+
+                    result.KeyValueAttributes[key] = value;
+                }
+            }
+        }
+
+        return result;
     }
 
     private bool TryParseIndentedCodeBlock(string line, int indent, int lineIndex, ref int currentIndex, out CodeBlockNode? codeBlock)
@@ -1583,6 +1886,17 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
 
     private bool IsBlockStart(string line)
     {
+        // Check for fenced div: ::: followed by at least one non-space character (the attributes)
+        if (line.Length >= 4 && line.StartsWith(":::"))
+        {
+            // Must have attributes after the colons to be an opening fence
+            var afterColons = line.Substring(3).TrimStart();
+            if (!string.IsNullOrWhiteSpace(afterColons))
+            {
+                return true;
+            }
+        }
+
         return line.StartsWith('#') ||
                line.StartsWith('>') ||
                (line.Length >= 3 && (line.StartsWith("---") || line.StartsWith("***") || line.StartsWith("___"))) ||

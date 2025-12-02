@@ -20,6 +20,7 @@ public static class MarkdownNodeType
     public static NodeType ListItem { get; } = NodeType.Custom("ListItem");
     public static NodeType ThematicBreak { get; } = NodeType.Custom("ThematicBreak");
     public static NodeType HtmlBlock { get; } = NodeType.Custom("HtmlBlock");
+    public static NodeType FencedDiv { get; } = NodeType.Custom("FencedDiv");
 
     // Inline node types
     public static NodeType Emphasis { get; } = NodeType.Custom("Emphasis");
