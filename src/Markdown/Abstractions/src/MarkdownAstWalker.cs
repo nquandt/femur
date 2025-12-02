@@ -96,6 +96,14 @@ public abstract class MarkdownAstWalker
     }
 
     /// <summary>
+    /// Visits a fenced div node and walks its children.
+    /// </summary>
+    protected virtual void VisitFencedDiv(FencedDivNode node)
+    {
+        this.WalkChildren(node);
+    }
+
+    /// <summary>
     /// Visits an emphasis node and walks its children.
     /// </summary>
     protected virtual void VisitEmphasis(EmphasisNode node)
@@ -222,6 +230,10 @@ public abstract class MarkdownAstWalker
         else if (nodeType == MarkdownNodeType.HtmlBlock)
         {
             this.VisitHtmlBlock((HtmlBlockNode)node);
+        }
+        else if (nodeType == MarkdownNodeType.FencedDiv)
+        {
+            this.VisitFencedDiv((FencedDivNode)node);
         }
         else if (nodeType == MarkdownNodeType.Emphasis)
         {

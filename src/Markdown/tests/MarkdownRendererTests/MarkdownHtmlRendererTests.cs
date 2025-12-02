@@ -1157,5 +1157,197 @@ var code = ""test"";
     }
 
     #endregion
+
+    #region Fenced Div Tests
+
+    [Fact]
+    public void Render_FencedDivWithClass_RendersDiv()
+    {
+        var markdown = """
+::: {.note}
+This is a note.
+:::
+""";
+        var result = ParseAndRender(markdown);
+
+        Assert.Contains("<div class=\"note\">", result);
+        Assert.Contains("This is a note.", result);
+        Assert.Contains("</div>", result);
+    }
+
+    [Fact]
+    public void Render_FencedDivWithId_RendersDivWithId()
+    {
+        var markdown = """
+::: {#special .sidebar}
+Content
+:::
+""";
+        var result = ParseAndRender(markdown);
+
+        Assert.Contains("<div id=\"special\" class=\"sidebar\">", result);
+        Assert.Contains("Content", result);
+        Assert.Contains("</div>", result);
+    }
+
+    [Fact]
+    public void Render_NamedFencedDivWithoutAttributes_RendersDivWithClass()
+    {
+        var markdown = """
+::: warning
+I am warning text
+:::
+""";
+        var result = ParseAndRender(markdown);
+
+        // Tag "warning" should be used as HTML tag and also added as class
+        Assert.Contains("<warning class=\"warning\">", result);
+        Assert.Contains("I am warning text", result);
+        Assert.Contains("</warning>", result);
+    }
+
+    [Fact]
+    public void Render_NamedFencedDivWithTag_RendersTag()
+    {
+        var markdown = """
+:::a
+My Button
+:::
+""";
+        var result = ParseAndRender(markdown);
+
+        // Tag "a" should be used as HTML tag, and also added as class since no attributes
+        Assert.Contains("<a class=\"a\">", result);
+        Assert.Contains("My Button", result);
+        Assert.Contains("</a>", result);
+    }
+
+    [Fact]
+    public void Render_NamedFencedDivWithAttributes_RendersTagWithAttributes()
+    {
+        var markdown = """
+:::C:Codeblock {lang="csharp"}
+    public static void main() {}
+:::
+""";
+        var result = ParseAndRender(markdown);
+
+        Assert.Contains("<C:Codeblock lang=\"csharp\">", result);
+        Assert.Contains("public static void main() {}", result);
+        Assert.Contains("</C:Codeblock>", result);
+    }
+
+    [Fact]
+    public void Render_FencedDivWithMultipleClasses_RendersAllClasses()
+    {
+        var markdown = """
+::: {.class1 .class2 .class3}
+Content
+:::
+""";
+        var result = ParseAndRender(markdown);
+
+        Assert.Contains("<div class=\"class1 class2 class3\">", result);
+        Assert.Contains("Content", result);
+        Assert.Contains("</div>", result);
+    }
+
+    [Fact]
+    public void Render_FencedDivWithKeyValueAttributes_RendersAttributes()
+    {
+        var markdown = """
+::: {lang="csharp" version="1.0"}
+Content
+:::
+""";
+        var result = ParseAndRender(markdown);
+
+        Assert.Contains("<div lang=\"csharp\" version=\"1.0\">", result);
+        Assert.Contains("Content", result);
+        Assert.Contains("</div>", result);
+    }
+
+    [Fact]
+    public void Render_NestedFencedDivs_RendersNested()
+    {
+        var markdown = """
+::::: {.outer}
+Outer content
+::: {.inner}
+Inner content
+:::
+More outer content
+:::::
+""";
+        var result = ParseAndRender(markdown);
+
+        Assert.Contains("<div class=\"outer\">", result);
+        Assert.Contains("<div class=\"inner\">", result);
+        Assert.Contains("Outer content", result);
+        Assert.Contains("Inner content", result);
+        Assert.Contains("More outer content", result);
+    }
+
+    [Fact]
+    public void Render_FencedDivWithParagraph_RendersParagraph()
+    {
+        var markdown = """
+::: {.container}
+This is a paragraph inside the div.
+:::
+""";
+        var result = ParseAndRender(markdown);
+
+        Assert.Contains("<div class=\"container\">", result);
+        Assert.Contains("<p>This is a paragraph inside the div.</p>", result);
+        Assert.Contains("</div>", result);
+    }
+
+    [Fact]
+    public void Render_FencedDivWithHeading_RendersHeading()
+    {
+        var markdown = """
+::: {.section}
+# Heading
+:::
+""";
+        var result = ParseAndRender(markdown);
+
+        Assert.Contains("<div class=\"section\">", result);
+        Assert.Contains("<h1>Heading</h1>", result);
+        Assert.Contains("</div>", result);
+    }
+
+    [Fact]
+    public void Render_FencedDivWithCodeBlock_RendersCodeBlock()
+    {
+        var markdown = """
+::: {.code}
+```csharp
+var x = 42;
+```
+:::
+""";
+        var result = ParseAndRender(markdown);
+
+        Assert.Contains("<div class=\"code\">", result);
+        Assert.Contains("<pre><code class=\"language-csharp\">", result);
+        Assert.Contains("var x = 42;", result);
+        Assert.Contains("</div>", result);
+    }
+
+    [Fact]
+    public void Render_FencedDivEmpty_RendersEmptyDiv()
+    {
+        var markdown = """
+::: {.empty}
+:::
+""";
+        var result = ParseAndRender(markdown);
+
+        Assert.Equal("<div class=\"empty\"></div>", result);
+    }
+
+    #endregion
 }
 

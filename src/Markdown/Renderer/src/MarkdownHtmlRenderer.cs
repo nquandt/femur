@@ -210,6 +210,72 @@ public class MarkdownHtmlRenderer : MarkdownAstWalker
         _ = this._output.Append(node.Content);
     }
 
+    protected override void VisitFencedDiv(FencedDivNode node)
+    {
+        // Determine tag name: use Tag if present, otherwise default to "div"
+        var tagName = !string.IsNullOrEmpty(node.Tag) ? node.Tag : "div";
+
+        // Build attributes
+        var attributes = new StringBuilder();
+        var hasAnyAttributes = false;
+
+        // Check if there are parsed attributes
+        var hasParsedAttributes = node.ParsedAttributes.Classes.Count > 0 ||
+                                  !string.IsNullOrEmpty(node.ParsedAttributes.Id) ||
+                                  node.ParsedAttributes.KeyValueAttributes.Count > 0;
+
+        // Add ID if present
+        if (!string.IsNullOrEmpty(node.ParsedAttributes.Id))
+        {
+            attributes.Append($" id=\"{EscapeHtmlAttribute(node.ParsedAttributes.Id!)}\"");
+            hasAnyAttributes = true;
+        }
+
+        // Add classes if present
+        if (node.ParsedAttributes.Classes.Count > 0)
+        {
+            var classList = string.Join(" ", node.ParsedAttributes.Classes.Select(c => EscapeHtmlAttribute(c)));
+            attributes.Append($" class=\"{classList}\"");
+            hasAnyAttributes = true;
+        }
+
+        // Add key-value attributes
+        foreach (var kvp in node.ParsedAttributes.KeyValueAttributes)
+        {
+            attributes.Append($" {EscapeHtmlAttribute(kvp.Key)}=\"{EscapeHtmlAttribute(kvp.Value)}\"");
+            hasAnyAttributes = true;
+        }
+
+        // If tag exists but no other attributes, add tag as class
+        // This handles cases like :::warning → <div class="warning"> or :::a → <a class="a">
+        if (!string.IsNullOrEmpty(node.Tag) && !hasParsedAttributes && string.IsNullOrEmpty(node.Attributes))
+        {
+            // Special case: if tag is a single word that looks like a CSS class (not an HTML tag),
+            // use "div" as tag and tag as class. Otherwise use tag as HTML tag and add as class.
+            // For now, we'll use tag as HTML tag and add as class for consistency
+            if (!hasAnyAttributes)
+            {
+                attributes.Append($" class=\"{EscapeHtmlAttribute(node.Tag!)}\"");
+                hasAnyAttributes = true;
+            }
+        }
+
+        // Render opening tag
+        _ = this._output.Append($"<{tagName}");
+        if (hasAnyAttributes)
+        {
+            _ = this._output.Append(attributes);
+        }
+
+        _ = this._output.Append('>');
+
+        // Walk children
+        this.WalkChildren(node);
+
+        // Render closing tag
+        _ = this._output.Append($"</{tagName}>");
+    }
+
     protected override void VisitEmphasis(EmphasisNode node)
     {
         _ = this._output.Append("<em>");
