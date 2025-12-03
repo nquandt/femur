@@ -26,7 +26,10 @@ public class XmlParser : StreamParser<XmlDocumentNode>
     /// <summary>
     /// Creates a new XML parser for the given stream
     /// </summary>
-    public XmlParser(Stream stream, int bufferSize = 4096) : base(stream, bufferSize)
+    /// <param name="stream">The stream to parse</param>
+    /// <param name="bufferSize">Size of the buffer for reading chunks (default 4096)</param>
+    /// <param name="leaveOpen">true to leave the stream open after the parser is disposed; otherwise, false (default false)</param>
+    public XmlParser(Stream stream, int bufferSize = 4096, bool leaveOpen = false) : base(stream, bufferSize, leaveOpen)
     {
     }
 
@@ -618,11 +621,14 @@ public class XmlParser : StreamParser<XmlDocumentNode>
     }
 
     /// <summary>
-    /// Parses XML from a stream
+    /// Parses XML from a stream.
     /// </summary>
-    public static XmlDocumentNode Parse(Stream stream)
+    /// <param name="stream">The stream to parse from</param>
+    /// <param name="leaveOpen">true to leave the stream open after parsing completes; otherwise, false (default false). The stream will be closed when parsing completes (or if an exception occurs) unless leaveOpen is true.</param>
+    /// <returns>The parsed XML document</returns>
+    public static XmlDocumentNode Parse(Stream stream, bool leaveOpen = false)
     {
-        var parser = new XmlParser(stream);
+        using var parser = new XmlParser(stream, leaveOpen: leaveOpen);
         return parser.Parse();
     }
 

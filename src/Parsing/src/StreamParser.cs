@@ -51,14 +51,15 @@ public abstract class StreamParser<TDocument> : IDisposable
     /// </summary>
     /// <param name="stream">The stream to parse</param>
     /// <param name="bufferSize">Size of the buffer for reading chunks (default 4096)</param>
-    protected StreamParser(Stream stream, int bufferSize = 4096)
+    /// <param name="leaveOpen">true to leave the stream open after the parser is disposed; otherwise, false (default false)</param>
+    protected StreamParser(Stream stream, int bufferSize = 4096, bool leaveOpen = false)
     {
         if (stream == null)
         {
             throw new ArgumentNullException(nameof(stream));
         }
 
-        this.Reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: bufferSize, leaveOpen: false);
+        this.Reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: bufferSize, leaveOpen: leaveOpen);
         this.Buffer = ArrayPool<char>.Shared.Rent(bufferSize);
         this.StringBuilder = new StringBuilder();
     }

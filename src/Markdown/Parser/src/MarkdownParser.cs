@@ -298,7 +298,10 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
     /// <summary>
     /// Creates a new Markdown parser for the given stream
     /// </summary>
-    public MarkdownParser(Stream stream, int bufferSize = 4096) : base(stream, bufferSize)
+    /// <param name="stream">The stream to parse</param>
+    /// <param name="bufferSize">Size of the buffer for reading chunks (default 4096)</param>
+    /// <param name="leaveOpen">true to leave the stream open after the parser is disposed; otherwise, false (default false)</param>
+    public MarkdownParser(Stream stream, int bufferSize = 4096, bool leaveOpen = false) : base(stream, bufferSize, leaveOpen)
     {
     }
 
@@ -3510,11 +3513,14 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
     #endregion
 
     /// <summary>
-    /// Parses Markdown from a stream
+    /// Parses Markdown from a stream.
     /// </summary>
-    public static MarkdownDocumentNode Parse(Stream stream)
+    /// <param name="stream">The stream to parse from</param>
+    /// <param name="leaveOpen">true to leave the stream open after parsing completes; otherwise, false (default false). The stream will be closed when parsing completes (or if an exception occurs) unless leaveOpen is true.</param>
+    /// <returns>The parsed Markdown document</returns>
+    public static MarkdownDocumentNode Parse(Stream stream, bool leaveOpen = false)
     {
-        var parser = new MarkdownParser(stream);
+        using var parser = new MarkdownParser(stream, leaveOpen: leaveOpen);
         return parser.Parse();
     }
 
