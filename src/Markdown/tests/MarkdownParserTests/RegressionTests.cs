@@ -515,6 +515,77 @@ public class RegressionTests : IClassFixture<TestFixture>, IDisposable
     }
 
     [Fact]
+    public void Parse_HtmlComment_DoesNotParseInternalMarkdown()
+    {
+        // HTML comments should absorb all content as raw text without parsing markdown
+        var markdown = """
+<!--
+This is a comment with *bold* and [link](url) and `code`
+# Heading
+- List item
+-->
+""";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        
+        // Verify all markdown-like syntax is preserved as-is
+        Assert.Contains("*bold*", htmlBlock.Content);
+        Assert.Contains("[link](url)", htmlBlock.Content);
+        Assert.Contains("`code`", htmlBlock.Content);
+        Assert.Contains("# Heading", htmlBlock.Content);
+        Assert.Contains("- List item", htmlBlock.Content);
+        
+        // Verify no markdown nodes were created from comment content
+        Assert.Single(result.Children); // Only the HTML block, no paragraphs or other nodes
+    }
+
+    [Fact]
+    public void Parse_HtmlComment_SingleLine_PreservesContent()
+    {
+        // Single-line HTML comment
+        var markdown = "<!-- This is a single line comment -->\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Equal("<!-- This is a single line comment -->", htmlBlock.Content.Trim());
+    }
+
+    [Fact]
+    public void Parse_HtmlComment_MultiLine_PreservesAllLines()
+    {
+        // Multi-line HTML comment
+        var markdown = """
+<!--
+Line 1
+Line 2
+Line 3
+-->
+""";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("Line 1", htmlBlock.Content);
+        Assert.Contains("Line 2", htmlBlock.Content);
+        Assert.Contains("Line 3", htmlBlock.Content);
+        Assert.Contains("<!--", htmlBlock.Content);
+        Assert.Contains("-->", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlComment_WithSpecialCharacters_PreservesContent()
+    {
+        // HTML comment with special characters that might be confused with markdown
+        var markdown = "<!-- Comment with <tags> and &entities; and *asterisks* -->\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("<tags>", htmlBlock.Content);
+        Assert.Contains("&entities;", htmlBlock.Content);
+        Assert.Contains("*asterisks*", htmlBlock.Content);
+    }
+
+    [Fact]
     public void Parse_HtmlBlockType3_ProcessingInstruction_ParsesCorrectly()
     {
         // Type 3: Processing instruction

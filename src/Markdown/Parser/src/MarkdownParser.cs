@@ -1681,19 +1681,41 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         // Type 2: HTML comment <!-- ... -->
         if (trimmed.StartsWith("<!--"))
         {
-            _ = content.Append(this._lines![currentIndex]);
+            var startLine = this._lines![currentIndex];
+            _ = content.Append(startLine);
             currentIndex++;
 
-            // Find closing -->
+            // Check if closing --> is on the same line
+            var closingIndex = startLine.IndexOf("-->");
+            if (closingIndex >= 0)
+            {
+                // Closing is on the same line - extract only up to and including -->
+                var commentEnd = closingIndex + 3;
+                var commentContent = startLine.Substring(0, commentEnd);
+                htmlBlock = new HtmlBlockNode { Content = commentContent, Location = new SourceLocation(0, commentContent.Length, lineIndex + 1, 1) };
+                return true;
+            }
+
+            // Find closing --> on subsequent lines
             while (currentIndex < this._lines!.Count)
             {
                 var currentLine = this._lines[currentIndex];
-                _ = content.Append('\n').Append(currentLine);
-                currentIndex++;
+                var lineClosingIndex = currentLine.IndexOf("-->");
 
-                if (currentLine.Contains("-->"))
+                if (lineClosingIndex >= 0)
                 {
+                    // Found closing --> on this line - include only up to and including -->
+                    var commentEnd = lineClosingIndex + 3;
+                    var lineContent = currentLine.Substring(0, commentEnd);
+                    _ = content.Append('\n').Append(lineContent);
+                    currentIndex++;
                     break;
+                }
+                else
+                {
+                    // No closing yet - include entire line
+                    _ = content.Append('\n').Append(currentLine);
+                    currentIndex++;
                 }
             }
 
