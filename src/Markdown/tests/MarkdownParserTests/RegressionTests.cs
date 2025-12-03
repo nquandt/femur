@@ -586,6 +586,102 @@ Line 3
     }
 
     [Fact]
+    public void Parse_HtmlComment_DoesNotIncludeContentAfterClosing()
+    {
+        // HTML comment should not include content after -->
+        var markdown = "<!-- Comment --> After comment\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Equal("<!-- Comment -->", htmlBlock.Content.Trim());
+        Assert.DoesNotContain("After comment", htmlBlock.Content);
+        
+        // Content after comment on same line may be ignored or parsed separately
+        // The important thing is it's not included in the HTML block
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[1]);
+        Assert.Contains("Paragraph", paragraph.Children.OfType<MarkdownTextNode>().First().Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType3_ProcessingInstruction_DoesNotIncludeContentAfterClosing()
+    {
+        // Type 3: Processing instruction should not include content after ?>
+        var markdown = "<?php\necho 'test';\n?> After content\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("<?php", htmlBlock.Content);
+        Assert.Contains("?>", htmlBlock.Content);
+        Assert.DoesNotContain("After content", htmlBlock.Content);
+        
+        // Content after ?> on same line may be ignored or parsed separately
+        // The important thing is it's not included in the HTML block
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[1]);
+        Assert.Contains("Paragraph", paragraph.Children.OfType<MarkdownTextNode>().First().Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType4_Declaration_DoesNotIncludeContentAfterClosing()
+    {
+        // Type 4: Declaration should not include content after >
+        var markdown = "<!DOCTYPE html>\n<html>\n> After DOCTYPE\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("<!DOCTYPE html>", htmlBlock.Content);
+        Assert.DoesNotContain("> After DOCTYPE", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType5_CDATA_DoesNotIncludeContentAfterClosing()
+    {
+        // Type 5: CDATA should not include content after ]]>
+        var markdown = "<![CDATA[\nSome data\n]]> After CDATA\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("<![CDATA[", htmlBlock.Content);
+        Assert.Contains("]]>", htmlBlock.Content);
+        Assert.DoesNotContain("After CDATA", htmlBlock.Content);
+        
+        // Content after ]]> on same line may be ignored or parsed separately
+        // The important thing is it's not included in the HTML block
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[1]);
+        Assert.Contains("Paragraph", paragraph.Children.OfType<MarkdownTextNode>().First().Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType1_Script_DoesNotIncludeContentAfterClosing()
+    {
+        // Type 1: Script tag should not include content after </script>
+        var markdown = "<script>\nalert('test');\n</script> After script\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("<script>", htmlBlock.Content);
+        Assert.Contains("</script>", htmlBlock.Content);
+        Assert.DoesNotContain("After script", htmlBlock.Content);
+        
+        // Content after </script> on same line may be ignored or parsed separately
+        // The important thing is it's not included in the HTML block
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[1]);
+        Assert.Contains("Paragraph", paragraph.Children.OfType<MarkdownTextNode>().First().Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType1_Style_DoesNotIncludeContentAfterClosing()
+    {
+        // Type 1: Style tag should not include content after </style>
+        var markdown = "<style>\nbody { color: red; }\n</style> After style\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("<style>", htmlBlock.Content);
+        Assert.Contains("</style>", htmlBlock.Content);
+        Assert.DoesNotContain("After style", htmlBlock.Content);
+    }
+
+    [Fact]
     public void Parse_HtmlBlockType3_ProcessingInstruction_ParsesCorrectly()
     {
         // Type 3: Processing instruction

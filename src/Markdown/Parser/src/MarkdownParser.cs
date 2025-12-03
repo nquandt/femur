@@ -1656,21 +1656,37 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             // Read until end tag found
             var tagMatch = Regex.Match(trimmed, @"^<(script|style|pre|iframe)", RegexOptions.IgnoreCase);
             var tagName = tagMatch.Groups[1].Value.ToLowerInvariant();
+            var closingTag = $"</{tagName}>";
 
             while (currentIndex < this._lines!.Count)
             {
                 var currentLine = this._lines[currentIndex];
-                if (content.Length > 0)
-                {
-                    _ = content.Append('\n');
-                }
+                var closingIndex = currentLine.IndexOf(closingTag, StringComparison.OrdinalIgnoreCase);
 
-                _ = content.Append(currentLine);
-                currentIndex++;
-
-                if (currentLine.Contains($"</{tagName}>", StringComparison.OrdinalIgnoreCase))
+                if (closingIndex >= 0)
                 {
+                    // Found closing tag - include only up to and including the closing tag
+                    var tagEnd = closingIndex + closingTag.Length;
+                    var lineContent = currentLine.Substring(0, tagEnd);
+                    if (content.Length > 0)
+                    {
+                        _ = content.Append('\n');
+                    }
+
+                    _ = content.Append(lineContent);
+                    currentIndex++;
                     break;
+                }
+                else
+                {
+                    // No closing tag yet - include entire line
+                    if (content.Length > 0)
+                    {
+                        _ = content.Append('\n');
+                    }
+
+                    _ = content.Append(currentLine);
+                    currentIndex++;
                 }
             }
 
@@ -1726,18 +1742,41 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         // Type 3: Processing instruction <? ... ?>
         if (trimmed.StartsWith("<?"))
         {
-            _ = content.Append(this._lines![currentIndex]);
+            var startLine = this._lines![currentIndex];
+            _ = content.Append(startLine);
             currentIndex++;
 
+            // Check if closing ?> is on the same line
+            var closingIndex = startLine.IndexOf("?>");
+            if (closingIndex >= 0)
+            {
+                // Closing is on the same line - extract only up to and including ?>
+                var instructionEnd = closingIndex + 2;
+                var instructionContent = startLine.Substring(0, instructionEnd);
+                htmlBlock = new HtmlBlockNode { Content = instructionContent, Location = new SourceLocation(0, instructionContent.Length, lineIndex + 1, 1) };
+                return true;
+            }
+
+            // Find closing ?> on subsequent lines
             while (currentIndex < this._lines!.Count)
             {
                 var currentLine = this._lines[currentIndex];
-                _ = content.Append('\n').Append(currentLine);
-                currentIndex++;
+                var lineClosingIndex = currentLine.IndexOf("?>");
 
-                if (currentLine.Contains("?>"))
+                if (lineClosingIndex >= 0)
                 {
+                    // Found closing ?> on this line - include only up to and including ?>
+                    var instructionEnd = lineClosingIndex + 2;
+                    var lineContent = currentLine.Substring(0, instructionEnd);
+                    _ = content.Append('\n').Append(lineContent);
+                    currentIndex++;
                     break;
+                }
+                else
+                {
+                    // No closing yet - include entire line
+                    _ = content.Append('\n').Append(currentLine);
+                    currentIndex++;
                 }
             }
 
@@ -1748,18 +1787,41 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         // Type 4: Declaration <! followed by uppercase ASCII letter
         if (trimmed.StartsWith("<!") && trimmed.Length > 2 && char.IsUpper(trimmed[2]))
         {
-            _ = content.Append(this._lines![currentIndex]);
+            var startLine = this._lines![currentIndex];
+            _ = content.Append(startLine);
             currentIndex++;
 
+            // Check if closing > is on the same line
+            var closingIndex = startLine.IndexOf('>');
+            if (closingIndex >= 0)
+            {
+                // Closing is on the same line - extract only up to and including >
+                var declarationEnd = closingIndex + 1;
+                var declarationContent = startLine.Substring(0, declarationEnd);
+                htmlBlock = new HtmlBlockNode { Content = declarationContent, Location = new SourceLocation(0, declarationContent.Length, lineIndex + 1, 1) };
+                return true;
+            }
+
+            // Find closing > on subsequent lines
             while (currentIndex < this._lines!.Count)
             {
                 var currentLine = this._lines[currentIndex];
-                _ = content.Append('\n').Append(currentLine);
-                currentIndex++;
+                var lineClosingIndex = currentLine.IndexOf('>');
 
-                if (currentLine.Contains('>'))
+                if (lineClosingIndex >= 0)
                 {
+                    // Found closing > on this line - include only up to and including >
+                    var declarationEnd = lineClosingIndex + 1;
+                    var lineContent = currentLine.Substring(0, declarationEnd);
+                    _ = content.Append('\n').Append(lineContent);
+                    currentIndex++;
                     break;
+                }
+                else
+                {
+                    // No closing yet - include entire line
+                    _ = content.Append('\n').Append(currentLine);
+                    currentIndex++;
                 }
             }
 
@@ -1770,18 +1832,41 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         // Type 5: CDATA section <![CDATA[ ... ]]>
         if (trimmed.StartsWith("<![CDATA["))
         {
-            _ = content.Append(this._lines![currentIndex]);
+            var startLine = this._lines![currentIndex];
+            _ = content.Append(startLine);
             currentIndex++;
 
+            // Check if closing ]]> is on the same line
+            var closingIndex = startLine.IndexOf("]]>");
+            if (closingIndex >= 0)
+            {
+                // Closing is on the same line - extract only up to and including ]]>
+                var cdataEnd = closingIndex + 3;
+                var cdataContent = startLine.Substring(0, cdataEnd);
+                htmlBlock = new HtmlBlockNode { Content = cdataContent, Location = new SourceLocation(0, cdataContent.Length, lineIndex + 1, 1) };
+                return true;
+            }
+
+            // Find closing ]]> on subsequent lines
             while (currentIndex < this._lines!.Count)
             {
                 var currentLine = this._lines[currentIndex];
-                _ = content.Append('\n').Append(currentLine);
-                currentIndex++;
+                var lineClosingIndex = currentLine.IndexOf("]]>");
 
-                if (currentLine.Contains("]]>"))
+                if (lineClosingIndex >= 0)
                 {
+                    // Found closing ]]> on this line - include only up to and including ]]>
+                    var cdataEnd = lineClosingIndex + 3;
+                    var lineContent = currentLine.Substring(0, cdataEnd);
+                    _ = content.Append('\n').Append(lineContent);
+                    currentIndex++;
                     break;
+                }
+                else
+                {
+                    // No closing yet - include entire line
+                    _ = content.Append('\n').Append(currentLine);
+                    currentIndex++;
                 }
             }
 
