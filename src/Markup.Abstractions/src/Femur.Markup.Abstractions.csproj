@@ -21,5 +21,10 @@
     <ProjectReference Include="../../Parsing/src/Femur.Parsing.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Femur.Html.Parser" />
+    <InternalsVisibleTo Include="Femur.Xml.Parser" />
+  </ItemGroup>
+
 </Project>
 

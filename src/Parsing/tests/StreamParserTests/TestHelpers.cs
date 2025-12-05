@@ -1,5 +1,6 @@
 using System.Text;
 using Femur.Parsing;
+using Femur.Parsing.Nodes;
 
 namespace StreamParserTests;
 
@@ -71,9 +72,11 @@ internal static class TestHelpers
         public new StringBuilder StringBuilder => base.StringBuilder;
     }
 
-    public class TestDocument
+    public class TestDocument : Node
     {
         public StringBuilder Content { get; } = new StringBuilder();
+
+        public override NodeType NodeType => NodeType.Custom("TestDocument");
     }
 }
 

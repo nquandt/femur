@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Femur.Parsing.csproj" />
+    <ProjectReference Include="../../../Markup.Abstractions/src/Femur.Markup.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

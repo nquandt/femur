@@ -1,7 +1,15 @@
 using System.Buffers;
 using System.Text;
+using Femur.Parsing.Nodes;
 
 namespace Femur.Parsing;
+
+/// <summary>
+/// Callback delegate invoked when a new node is created during parsing.
+/// Allows consumers to track and aggregate node data without re-walking the AST.
+/// </summary>
+/// <param name="node">The newly created node</param>
+public delegate void NodeCreatedCallback(Node node);
 
 /// <summary>
 /// Base class for streaming parsers that read from a Stream and build an AST.
@@ -13,7 +21,7 @@ namespace Femur.Parsing;
 /// Implements IDisposable to properly clean up the StreamReader and buffer resources.
 /// </summary>
 /// <typeparam name="TDocument">The document type returned by the parser</typeparam>
-public abstract class StreamParser<TDocument> : IDisposable
+public abstract class StreamParser<TDocument> : IDisposable where TDocument : Node
 {
     private bool _disposed;
     /// <summary>
@@ -47,6 +55,12 @@ public abstract class StreamParser<TDocument> : IDisposable
     protected StringBuilder StringBuilder { get; }
 
     /// <summary>
+    /// Callback invoked when a new node is created during parsing.
+    /// Can be set during instantiation or Parse() call to track nodes without re-walking the AST.
+    /// </summary>
+    protected NodeCreatedCallback? NodeCreatedCallback { get; set; }
+
+    /// <summary>
     /// Creates a new streaming parser for the given stream
     /// </summary>
     /// <param name="stream">The stream to parse</param>
@@ -72,10 +86,18 @@ public abstract class StreamParser<TDocument> : IDisposable
     /// 2. Initialize parsing state
     /// 3. Main parsing loop (process characters)
     /// 4. Cleanup
+    /// 
+    /// Optional callback can be provided to track node creation without re-walking the AST.
+    /// Useful for aggregating data (e.g., all class attribute values) during streaming parsing.
     /// </summary>
-    public TDocument Parse()
+    /// <param name="nodeCreatedCallback">Optional callback invoked for each node created during parsing</param>
+    public TDocument Parse(NodeCreatedCallback? nodeCreatedCallback = null)
     {
+        this.NodeCreatedCallback = nodeCreatedCallback;
         var document = this.CreateDocument();
+
+        // Invoke callback for document node creation
+        this.OnNodeCreated(document);
 
         if (!this.ReadMore())
         {
@@ -136,6 +158,16 @@ public abstract class StreamParser<TDocument> : IDisposable
     protected virtual void Cleanup()
     {
         this.Dispose(true);
+    }
+
+    /// <summary>
+    /// Invokes the node created callback if one is set.
+    /// Subclasses should call this method whenever a node is created during parsing.
+    /// </summary>
+    /// <param name="node">The newly created node</param>
+    protected void OnNodeCreated(Node node)
+    {
+        this.NodeCreatedCallback?.Invoke(node);
     }
 
     /// <summary>

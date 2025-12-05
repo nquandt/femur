@@ -69,6 +69,19 @@ public class XmlParser : StreamParser<XmlDocumentNode>
     }
 
     /// <summary>
+    /// Helper method to add a child node and update sibling references.
+    /// Maintains bidirectional sibling links during parsing.
+    /// </summary>
+    private void AddChildWithSiblings(Node child, ContainerNode? parent)
+    {
+        if (parent != null)
+        {
+            parent.Children.Add(child);
+            parent.UpdateSiblingReferences();
+        }
+    }
+
+    /// <summary>
     /// Processes a tag (opening, closing, or special tag like comment/CDATA/processing instruction)
     /// 
     /// After detecting '&lt;', we examine the next character to determine tag type:
@@ -185,8 +198,9 @@ public class XmlParser : StreamParser<XmlDocumentNode>
             Content = content,
             Location = new SourceLocation(startPos, this.GetAbsolutePosition() - startPos)
         };
-        comment.Parent = this._currentParent;
-        this._currentParent?.Children.Add(comment);
+        comment.SetParent(this._currentParent);
+        this.AddChildWithSiblings(comment, this._currentParent);
+        this.OnNodeCreated(comment);
     }
 
     /// <summary>
@@ -225,8 +239,9 @@ public class XmlParser : StreamParser<XmlDocumentNode>
             Content = content,
             Location = new SourceLocation(startPos, this.GetAbsolutePosition() - startPos)
         };
-        cdata.Parent = this._currentParent;
-        this._currentParent?.Children.Add(cdata);
+        cdata.SetParent(this._currentParent);
+        this.AddChildWithSiblings(cdata, this._currentParent);
+        this.OnNodeCreated(cdata);
     }
 
     /// <summary>
@@ -277,8 +292,9 @@ public class XmlParser : StreamParser<XmlDocumentNode>
             Content = this.StringBuilder.ToString().Trim(),
             Location = new SourceLocation(startPos, this.GetAbsolutePosition() - startPos)
         };
-        pi.Parent = this._currentParent;
-        this._currentParent?.Children.Add(pi);
+        pi.SetParent(this._currentParent);
+        this.AddChildWithSiblings(pi, this._currentParent);
+        this.OnNodeCreated(pi);
 
         // If this is the XML declaration (<?xml ...?>), store it in the document
         if (target.Equals("xml", StringComparison.OrdinalIgnoreCase) && this._document != null)
@@ -328,7 +344,7 @@ public class XmlParser : StreamParser<XmlDocumentNode>
         // This ensures subsequent sibling elements are added to the correct parent
         if (foundMatch && matchedElement != null)
         {
-            this._currentParent = matchedElement.Parent as ContainerNode;
+            this._currentParent = matchedElement.GetParent() as ContainerNode;
         }
         // If we didn't find a match and stack is empty, restore to document root
         if (!foundMatch && this._elementStack.Count == 0)
@@ -353,8 +369,9 @@ public class XmlParser : StreamParser<XmlDocumentNode>
             return;
         }
 
-        element.Parent = this._currentParent;
-        this._currentParent?.Children.Add(element);
+        element.SetParent(this._currentParent);
+        this.AddChildWithSiblings(element, this._currentParent);
+        this.OnNodeCreated(element);
 
         // XML doesn't have void elements - all tags must be closed
         // Self-closing tags (<tag />) don't go on the stack
@@ -387,8 +404,9 @@ public class XmlParser : StreamParser<XmlDocumentNode>
             Content = text,
             Location = new SourceLocation(startPos, endPos - startPos)
         };
-        textNode.Parent = this._currentParent;
-        this._currentParent?.Children.Add(textNode);
+        textNode.SetParent(this._currentParent);
+        this.AddChildWithSiblings(textNode, this._currentParent);
+        this.OnNodeCreated(textNode);
     }
 
     /// <summary>
@@ -625,28 +643,33 @@ public class XmlParser : StreamParser<XmlDocumentNode>
     /// </summary>
     /// <param name="stream">The stream to parse from</param>
     /// <param name="leaveOpen">true to leave the stream open after parsing completes; otherwise, false (default false). The stream will be closed when parsing completes (or if an exception occurs) unless leaveOpen is true.</param>
+    /// <param name="nodeCreatedCallback">Optional callback invoked for each node created during parsing</param>
     /// <returns>The parsed XML document</returns>
-    public static XmlDocumentNode Parse(Stream stream, bool leaveOpen = false)
+    public static XmlDocumentNode Parse(Stream stream, bool leaveOpen = false, NodeCreatedCallback? nodeCreatedCallback = null)
     {
         using var parser = new XmlParser(stream, leaveOpen: leaveOpen);
-        return parser.Parse();
+        return parser.Parse(nodeCreatedCallback);
     }
 
     /// <summary>
     /// Parses XML from a byte array
     /// </summary>
-    public static XmlDocumentNode Parse(byte[] bytes)
+    /// <param name="bytes">The byte array containing XML</param>
+    /// <param name="nodeCreatedCallback">Optional callback invoked for each node created during parsing</param>
+    public static XmlDocumentNode Parse(byte[] bytes, NodeCreatedCallback? nodeCreatedCallback = null)
     {
         using var stream = new MemoryStream(bytes);
-        return Parse(stream);
+        return Parse(stream, nodeCreatedCallback: nodeCreatedCallback);
     }
 
     /// <summary>
     /// Parses XML from a string
     /// </summary>
-    public static XmlDocumentNode Parse(string xml)
+    /// <param name="xml">The XML string to parse</param>
+    /// <param name="nodeCreatedCallback">Optional callback invoked for each node created during parsing</param>
+    public static XmlDocumentNode Parse(string xml, NodeCreatedCallback? nodeCreatedCallback = null)
     {
         var bytes = Encoding.UTF8.GetBytes(xml);
-        return Parse(bytes);
+        return Parse(bytes, nodeCreatedCallback);
     }
 }

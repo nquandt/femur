@@ -495,7 +495,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                             foreach (var child in paragraph.Children.ToList())
                             {
                                 setextHeading.Children.Add(child);
-                                child.Parent = setextHeading;
+                                child.SetParent(setextHeading);
                             }
 
                             this.AddBlock(setextHeading);
@@ -517,7 +517,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
 
     private void AddBlock(Node node)
     {
-        node.Parent = this._currentParent;
+        node.SetParent(this._currentParent);
         this._currentParent?.Children.Add(node);
     }
 
@@ -914,7 +914,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         {
             foreach (var child in contentDoc.Children)
             {
-                child.Parent = fencedDiv;
+                child.SetParent(fencedDiv);
                 fencedDiv.Children.Add(child);
             }
         }
@@ -1294,7 +1294,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                 var listItem = this.ParseListItem(currentLine, currentIndex, ref currentIndex);
                 if (listItem != null)
                 {
-                    listItem.Parent = list;
+                    listItem.SetParent(list);
                     list.Children.Add(listItem);
                 }
             }
@@ -1494,7 +1494,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             {
                 var paragraph = new ParagraphNode();
                 paragraph.Children.Add(new MarkdownTextNode { Content = content });
-                paragraph.Parent = listItem;
+                paragraph.SetParent(listItem);
                 listItem.Children.Add(paragraph);
             }
         }
@@ -2083,7 +2083,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         }
 
         // Apply smart punctuation to text nodes (but not in code spans/blocks)
-        if (node is MarkdownTextNode textNode && !(node.Parent is CodeSpanNode))
+        if (node is MarkdownTextNode textNode)
         {
             textNode.Content = this.ApplySmartPunctuationToText(textNode.Content, originalText);
         }
@@ -2129,7 +2129,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
 
             foreach (var newNode in newNodes)
             {
-                newNode.Parent = container;
+                newNode.SetParent(container);
                 container.Children.Insert(index, newNode);
                 index++;
             }

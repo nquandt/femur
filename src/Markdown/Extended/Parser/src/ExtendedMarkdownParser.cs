@@ -2,6 +2,7 @@ using System.Text;
 using Femur.Markdown.Abstractions.Nodes;
 using Femur.Markdown.Extended.Abstractions.Nodes;
 using Femur.Markdown.Parser;
+using Femur.Parsing;
 using YamlDotNet.RepresentationModel;
 
 namespace Femur.Markdown.Extended.Parser;
@@ -40,9 +41,9 @@ public class ExtendedMarkdownParser : MarkdownParser
     /// Parses the stream and returns an ExtendedMarkdownDocumentNode with frontmatter support.
     /// </summary>
     /// <returns>An ExtendedMarkdownDocumentNode containing parsed markdown and frontmatter.</returns>
-    public new ExtendedMarkdownDocumentNode Parse()
+    public new ExtendedMarkdownDocumentNode Parse(NodeCreatedCallback? nodeCreatedCallback = null)
     {
-        var document = base.Parse();
+        var document = base.Parse(nodeCreatedCallback);
         return (ExtendedMarkdownDocumentNode)document;
     }
 

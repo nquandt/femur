@@ -87,6 +87,19 @@ public class HtmlParser : StreamParser<DocumentNode>
     }
 
     /// <summary>
+    /// Helper method to add a child node and update sibling references.
+    /// Maintains bidirectional sibling links during parsing.
+    /// </summary>
+    private void AddChildWithSiblings(Node child, ContainerNode? parent)
+    {
+        if (parent != null)
+        {
+            parent.Children.Add(child);
+            parent.UpdateSiblingReferences();
+        }
+    }
+
+    /// <summary>
     /// Processes a tag (opening, closing, or special tag like comment/CDATA)
     /// 
     /// After detecting '&lt;', we examine the next character to determine tag type:
@@ -143,8 +156,9 @@ public class HtmlParser : StreamParser<DocumentNode>
         // Add to current parent's children (doesn't change currentParent)
         if (node != null)
         {
-            node.Parent = this._currentParent;
-            this._currentParent?.Children.Add(node);
+            node.SetParent(this._currentParent);
+            this.AddChildWithSiblings(node, this._currentParent);
+            this.OnNodeCreated(node);
         }
     }
 
@@ -192,14 +206,14 @@ public class HtmlParser : StreamParser<DocumentNode>
             // Tag doesn't match - this closing tag doesn't match the most recent opening tag
             // Continue up the stack looking for a match (handles malformed HTML)
             // We update currentParent as we go up, but will override it if we find a match
-            this._currentParent = topElement.Parent as ContainerNode;
+            this._currentParent = topElement.GetParent() as ContainerNode;
         }
 
         // If we found a match, restore currentParent to the matched element's parent
         // This ensures subsequent sibling elements are added to the correct parent
         if (foundMatch && matchedElement != null)
         {
-            this._currentParent = matchedElement.Parent as ContainerNode;
+            this._currentParent = matchedElement.GetParent() as ContainerNode;
 
             // Track if we're exiting a script or style tag
             if (string.Equals(matchedElement.TagName, "script", StringComparison.OrdinalIgnoreCase) ||
@@ -300,8 +314,9 @@ public class HtmlParser : StreamParser<DocumentNode>
         }
 
         // Set parent-child relationship
-        element.Parent = this._currentParent;
-        this._currentParent?.Children.Add(element);
+        element.SetParent(this._currentParent);
+        this.AddChildWithSiblings(element, this._currentParent);
+        this.OnNodeCreated(element);
 
         // Only push non-void, non-self-closing elements onto stack
         // These elements can have children and need matching closing tags
@@ -359,8 +374,9 @@ public class HtmlParser : StreamParser<DocumentNode>
             Content = text, // Preserve original content including whitespace
             Location = new SourceLocation(startPos, endPos - startPos)
         };
-        textNode.Parent = this._currentParent;
-        this._currentParent?.Children.Add(textNode);
+        textNode.SetParent(this._currentParent);
+        this.AddChildWithSiblings(textNode, this._currentParent);
+        this.OnNodeCreated(textNode);
     }
 
 
@@ -882,8 +898,9 @@ public class HtmlParser : StreamParser<DocumentNode>
             if (xmlElement != null)
             {
                 // Set parent and add to HTML AST
-                xmlElement.Parent = this._currentParent;
-                this._currentParent?.Children.Add(xmlElement);
+                xmlElement.SetParent(this._currentParent);
+                this.AddChildWithSiblings(xmlElement, this._currentParent);
+                this.OnNodeCreated(xmlElement);
 
                 // Foreign elements (SVG/MathML) are not pushed onto the stack
                 // HTML elements after foreign elements should be siblings, not children
@@ -1124,28 +1141,33 @@ public class HtmlParser : StreamParser<DocumentNode>
     /// </summary>
     /// <param name="stream">The stream to parse from</param>
     /// <param name="leaveOpen">true to leave the stream open after parsing completes; otherwise, false (default false). The stream will be closed when parsing completes (or if an exception occurs) unless leaveOpen is true.</param>
+    /// <param name="nodeCreatedCallback">Optional callback invoked for each node created during parsing</param>
     /// <returns>The parsed HTML document</returns>
-    public static DocumentNode Parse(Stream stream, bool leaveOpen = false)
+    public static DocumentNode Parse(Stream stream, bool leaveOpen = false, NodeCreatedCallback? nodeCreatedCallback = null)
     {
         using var parser = new HtmlParser(stream, leaveOpen: leaveOpen);
-        return parser.Parse();
+        return parser.Parse(nodeCreatedCallback);
     }
 
     /// <summary>
     /// Parses HTML from a byte array
     /// </summary>
-    public static DocumentNode Parse(byte[] bytes)
+    /// <param name="bytes">The byte array containing HTML</param>
+    /// <param name="nodeCreatedCallback">Optional callback invoked for each node created during parsing</param>
+    public static DocumentNode Parse(byte[] bytes, NodeCreatedCallback? nodeCreatedCallback = null)
     {
         using var stream = new MemoryStream(bytes);
-        return Parse(stream);
+        return Parse(stream, nodeCreatedCallback: nodeCreatedCallback);
     }
 
     /// <summary>
     /// Parses HTML from a string
     /// </summary>
-    public static DocumentNode Parse(string html)
+    /// <param name="html">The HTML string to parse</param>
+    /// <param name="nodeCreatedCallback">Optional callback invoked for each node created during parsing</param>
+    public static DocumentNode Parse(string html, NodeCreatedCallback? nodeCreatedCallback = null)
     {
         var bytes = Encoding.UTF8.GetBytes(html);
-        return Parse(bytes);
+        return Parse(bytes, nodeCreatedCallback);
     }
 }
