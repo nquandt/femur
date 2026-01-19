@@ -906,6 +906,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             Tag = name,
             Attributes = attributes,
             OpeningFenceLength = fenceLength,
+            RawContent = contentStr,
             Location = new SourceLocation(0, divContent.Count, lineIndex + 1, 1)
         };
 

@@ -34,6 +34,12 @@ public class FencedDivNode : MarkdownContainerNode
     /// </summary>
     public int OpeningFenceLength { get; set; } = 3;
 
+    /// <summary>
+    /// The raw text content of the fenced div (without the opening and closing fences).
+    /// This contains the unparsed markdown content inside the div, similar to how CodeBlockNode.Content works.
+    /// </summary>
+    public string RawContent { get; set; } = string.Empty;
+
     public override NodeType NodeType => MarkdownNodeType.FencedDiv;
 }
 
