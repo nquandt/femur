@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
+using Femur.Logging.Bootstrap;
 
 [assembly: InternalsVisibleTo("Femur.Hosting.Web")]
 
@@ -313,7 +314,8 @@ public class ApplicationBuilder :
     /// <returns>A configured logger instance.</returns>
     internal BootstrapLogger CreateBootstrapLogger(Action<ILoggingBuilder> configure)
     {
-        return new BootstrapLogger(configure);
+        var discoveredType = TypeDiscovery.GetDiscoveredProgramType();
+        return BootstrapLogger.Create(discoveredType, configure);
     }
 
     /// <summary>
@@ -401,7 +403,7 @@ public class ApplicationBuilder :
     /// </returns>
     public async Task<int> RunAsync<TApplication>() where TApplication : class, IConsoleApplication
     {
-        ILogger? bootstrapLogger = null;
+        BootstrapLogger? bootstrapLogger = null;
 
         // Try to create bootstrap logger, exit early with special code if it fails
         try
@@ -447,7 +449,7 @@ public class ApplicationBuilder :
     /// </summary>
     /// <param name="bootstrapLogger">The bootstrap logger to use for early logging.</param>
     /// <returns>Exit code indicating the result of the operation.</returns>
-    private async Task<int> RunAsConsoleApplicationAsync(ILogger bootstrapLogger)
+    private async Task<int> RunAsConsoleApplicationAsync(BootstrapLogger bootstrapLogger)
     {
         HostApplicationBuilder? hostBuilder = null;
         IHost? host = null;
@@ -471,9 +473,9 @@ public class ApplicationBuilder :
                 await this._configureServices(hostBuilder.Services);
             }
 
-            // Configure logging in the application container using the same configuration as bootstrap
-            _ = hostBuilder.Logging.ClearProviders();
-            this._useBootstrapLogging(hostBuilder.Logging);
+            // Configure logging in the application container using bootstrapped services
+            bootstrapLogger.LogInformation("Configuring console application logging with bootstrapped services");
+            hostBuilder.Services.AddBootstrappedLogging(bootstrapLogger);
 
             bootstrapLogger.LogInformation("Building console application host");
             host = hostBuilder.Build();
@@ -545,7 +547,11 @@ public class ApplicationBuilder :
                 }
             }
 
-            if (bootstrapLogger is IDisposable disposable)
+            if (bootstrapLogger is IAsyncDisposable asyncDisposable)
+            {
+                await asyncDisposable.DisposeAsync();
+            }
+            else if (bootstrapLogger is IDisposable disposable)
             {
                 disposable.Dispose();
             }

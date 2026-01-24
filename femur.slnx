@@ -39,6 +39,10 @@
     <Project Path="src/Hosting/src/Femur.Hosting.csproj" />
   </Folder>
 
+  <Folder Name="/src/Hosting/tests/">
+    <Project Path="src/Hosting/tests/HostingTests.csproj" />
+  </Folder>
+
   <Folder Name="/src/Hosting/example/">
     <Project Path="src/Hosting/example/Femur.Hosting.Example.csproj" />
   </Folder>

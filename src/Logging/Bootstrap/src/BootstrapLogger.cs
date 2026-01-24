@@ -1,5 +1,8 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+
+[assembly: InternalsVisibleTo("Femur.Hosting")]
 
 namespace Femur.Logging.Bootstrap;
 
@@ -25,6 +28,22 @@ public class BootstrapLogger : ILogger, IDisposable, IAsyncDisposable
 
     public static BootstrapLogger Create<T>(Action<ILoggingBuilder> configure, Action<IServiceCollection>? configureServices)
     {
+        return Create(typeof(T), configure, configureServices);
+    }
+
+    /// <summary>
+    /// Creates a BootstrapLogger using a runtime Type parameter.
+    /// Internal for use by hosting frameworks that perform type discovery.
+    /// </summary>
+    /// <param name="loggerType">The type to use for the ILogger category.</param>
+    /// <param name="configure">An action to configure the logging builder.</param>
+    /// <param name="configureServices">Optional action to configure additional services.</param>
+    /// <returns>A configured BootstrapLogger instance.</returns>
+    internal static BootstrapLogger Create(
+        Type loggerType,
+        Action<ILoggingBuilder> configure,
+        Action<IServiceCollection>? configureServices = null)
+    {
         var bootstrappedServices = new ServiceCollection();
         bootstrappedServices.AddLogging(b =>
         {
@@ -32,12 +51,13 @@ public class BootstrapLogger : ILogger, IDisposable, IAsyncDisposable
             configure(b);
         });
 
-        // Allow additional services to be registered (e.g., ActivitySource for OpenTelemetry)
         configureServices?.Invoke(bootstrappedServices);
 
         var serviceProvider = bootstrappedServices.BuildServiceProvider();
+        var genericLoggerType = typeof(ILogger<>).MakeGenericType(loggerType);
+        var lazyLogger = new Lazy<ILogger>(() => (ILogger)serviceProvider.GetRequiredService(genericLoggerType));
 
-        return new BootstrapLogger<T>(bootstrappedServices, serviceProvider);
+        return new BootstrapLogger(bootstrappedServices, serviceProvider, lazyLogger);
     }
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
@@ -114,3 +134,4 @@ public class BootstrapLogger : ILogger, IDisposable, IAsyncDisposable
 
     internal IServiceProvider ServiceProvider => this._serviceProvider;
 }
+

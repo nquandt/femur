@@ -155,7 +155,11 @@ public class WebApplicationBuilder
                 }
             }
 
-            if (bootstrapLogger is IDisposable disposable)
+            if (bootstrapLogger is IAsyncDisposable asyncDisposable)
+            {
+                await asyncDisposable.DisposeAsync();
+            }
+            else if (bootstrapLogger is IDisposable disposable)
             {
                 disposable.Dispose();
             }
@@ -180,8 +184,8 @@ public class WebApplicationBuilder
             var loggerFactory = app.Services.GetService<ILoggerFactory>();
             if (loggerFactory != null)
             {
-                // Get the category name from FemurApplicationBuilder's discovery logic
-                var categoryName = BootstrapLogger.GetLoggerCategoryName();
+                // Get the category name from type discovery logic
+                var categoryName = TypeDiscovery.GetAutoDiscoveredLoggerCategoryName();
                 return loggerFactory.CreateLogger(categoryName);
             }
 

@@ -170,7 +170,7 @@ This package includes two complete examples in the repository:
 
 ### BootstrapLogger.Create&lt;T&gt;
 
-Creates a new bootstrap logger.
+Creates a new bootstrap logger with an explicit type parameter.
 
 ```csharp
 BootstrapLogger Create<T>(
@@ -199,6 +199,29 @@ IServiceCollection AddBootstrappedLogging(
 - `logger`: The bootstrap logger to transfer
 
 **Returns:** The service collection for chaining
+
+## Integration with Femur.Hosting
+
+If you're using the Femur.Hosting framework, bootstrap logging is built-in. The framework automatically creates a bootstrap logger with type discovery, uses it during startup, and seamlessly transfers it to your application's host:
+
+```csharp
+using Femur.Hosting;
+
+// The framework handles bootstrap logging automatically
+var result = await ApplicationBuilder.Create(args)
+    .UseDefaultConsoleLogging()  // Bootstrap logger is created here
+    .SkipConfiguration()
+    .ConfigureServices(services =>
+    {
+        services.AddHostedService<MyWorkerService>();
+    })
+    .SkipConfigureErrorHandlers()
+    .RunAsync();
+
+return result;
+```
+
+The Femur.Hosting framework provides comprehensive error handling, graceful shutdown, and detailed logging throughout the application lifecycle, all built on top of this bootstrap logging infrastructure. Type discovery for logger categories is handled internally by the hosting framework.
 
 ## Requirements
 
