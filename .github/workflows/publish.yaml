@@ -24,11 +24,13 @@ jobs:
       run: |
         dotnet pack ./src/AspNetCore/Endpoints/src/Femur.AspNetCore.Endpoints.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/AspNetCore/src/Femur.AspNetCore.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
+        dotnet pack ./src/DependencyInjection/src/Femur.DependencyInjection.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/FileSystem/AzureBlob/src/Femur.FileSystem.AzureBlob.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/FileSystem/src/Femur.FileSystem.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Hosting/src/Femur.Hosting.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Hosting/Web/src/Femur.Hosting.Web.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Html/Parser/src/Femur.Html.Parser.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
+        dotnet pack ./src/Logging/Bootstrap/src/Femur.Logging.Bootstrap.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Markdown/Abstractions/src/Femur.Markdown.Abstractions.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Markdown/Parser/src/Femur.Markdown.Parser.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Markdown/Renderer/src/Femur.Markdown.Renderer.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
@@ -44,11 +46,13 @@ jobs:
       run: |
         dotnet nuget push ./artifacts/Femur.AspNetCore.Endpoints.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.AspNetCore.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+        dotnet nuget push ./artifacts/Femur.DependencyInjection.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.FileSystem.AzureBlob.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.FileSystem.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Hosting.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Hosting.Web.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Html.Parser.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+        dotnet nuget push ./artifacts/Femur.Logging.Bootstrap.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Markdown.Abstractions.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Markdown.Parser.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Markdown.Renderer.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}

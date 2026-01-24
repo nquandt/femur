@@ -3,11 +3,10 @@
     <LangVersion>12</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors />
-    <WarningsNotAsErrors />
   </PropertyGroup>
 
   <ItemGroup Condition="'$(IsPackable)' != 'false'">
-    <PackageReference Include="Workleap.DotNet.CodingStandards" Version="1.1.36">
+    <PackageReference Include="Workleap.DotNet.CodingStandards" Version="1.1.46">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
@@ -18,7 +17,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="System.Memory" Version="4.5.5" />
+    <PackageReference Include="System.Memory" Version="4.6.3" />
   </ItemGroup>
 </Project>
 

@@ -63,10 +63,10 @@
     <Project Path="src/Html/Parser/src/Femur.Html.Parser.csproj" />
   </Folder>
 
-  <!-- <Folder Name="/src/Chtml/Parser/src/">
+  <Folder Name="/src/Chtml/Parser/src/">
     <Project Path="src/Chtml/Parser/src/Femur.Chtml.Parser.csproj" />
-  </Folder> -->
-<!-- 
+  </Folder>
+
   <Folder Name="/src/Chtml/CSharpRenderer/src/">
     <Project Path="src/Chtml/CSharpRenderer/src/Femur.Chtml.CSharpRenderer.csproj" />
   </Folder>
@@ -77,7 +77,31 @@
 
   <Folder Name="/src/Chtml/CSharpRenderer/examples/SimpleTemplates/">
     <Project Path="src/Chtml/CSharpRenderer/examples/SimpleTemplates/SimpleTemplates.csproj" />
-  </Folder> -->
+  </Folder>
+
+  <Folder Name="/src/DependencyInjection/src/">
+    <Project Path="src/DependencyInjection/src/Femur.DependencyInjection.csproj" />
+  </Folder>
+
+  <Folder Name="/src/DependencyInjection/tests/">
+    <Project Path="src/DependencyInjection/tests/DependencyInjectionTests.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Logging/Bootstrap/src/">
+    <Project Path="src/Logging/Bootstrap/src/Femur.Logging.Bootstrap.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Logging/Bootstrap/tests/">
+    <Project Path="src/Logging/Bootstrap/tests/LoggingBootstrapTests.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Logging/examples/BasicExample/">
+    <Project Path="src/Logging/examples/BasicExample/Femur.Logging.Example.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Logging/examples/AdvancedExample/">
+    <Project Path="src/Logging/examples/AdvancedExample/Femur.Logging.AdvancedExample.csproj" />
+  </Folder>
 
   <Folder Name="/src/Xml/Abstractions/src/">
     <Project Path="src/Xml/Abstractions/src/Femur.Xml.Abstractions.csproj" />
@@ -119,11 +143,11 @@
     <Project Path="src/Html/tests/HtmlParserTests/HtmlParserTests.csproj" />
     <Project Path="src/Html/tests/HtmlParserTests.NetStandard20/HtmlParserTests.NetStandard20.csproj" />
   </Folder>
-<!-- 
+
   <Folder Name="/src/Chtml/Parser/tests/">
     <Project Path="src/Chtml/Parser/tests/ChtmlParserTests/ChtmlParserTests.csproj" />
     <Project Path="src/Chtml/Parser/tests/ChtmlParserTests.NetStandard20/ChtmlParserTests.NetStandard20.csproj" />
-  </Folder> -->
+  </Folder>
 
   <Folder Name="/src/Xml/tests/">
     <Project Path="src/Xml/tests/XmlParserTests/XmlParserTests.csproj" />
