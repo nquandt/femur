@@ -67,22 +67,6 @@
     <Project Path="src/Html/Parser/src/Femur.Html.Parser.csproj" />
   </Folder>
 
-  <Folder Name="/src/Chtml/Parser/src/">
-    <Project Path="src/Chtml/Parser/src/Femur.Chtml.Parser.csproj" />
-  </Folder>
-
-  <Folder Name="/src/Chtml/CSharpRenderer/src/">
-    <Project Path="src/Chtml/CSharpRenderer/src/Femur.Chtml.CSharpRenderer.csproj" />
-  </Folder>
-
-  <Folder Name="/src/Chtml/Runtime/src/">
-    <Project Path="src/Chtml/Runtime/src/Femur.Chtml.Runtime.csproj" />
-  </Folder>
-
-  <Folder Name="/src/Chtml/CSharpRenderer/examples/SimpleTemplates/">
-    <Project Path="src/Chtml/CSharpRenderer/examples/SimpleTemplates/SimpleTemplates.csproj" />
-  </Folder>
-
   <Folder Name="/src/DependencyInjection/src/">
     <Project Path="src/DependencyInjection/src/Femur.DependencyInjection.csproj" />
   </Folder>
@@ -146,11 +130,6 @@
   <Folder Name="/src/Html/tests/">
     <Project Path="src/Html/tests/HtmlParserTests/HtmlParserTests.csproj" />
     <Project Path="src/Html/tests/HtmlParserTests.NetStandard20/HtmlParserTests.NetStandard20.csproj" />
-  </Folder>
-
-  <Folder Name="/src/Chtml/Parser/tests/">
-    <Project Path="src/Chtml/Parser/tests/ChtmlParserTests/ChtmlParserTests.csproj" />
-    <Project Path="src/Chtml/Parser/tests/ChtmlParserTests.NetStandard20/ChtmlParserTests.NetStandard20.csproj" />
   </Folder>
 
   <Folder Name="/src/Xml/tests/">
