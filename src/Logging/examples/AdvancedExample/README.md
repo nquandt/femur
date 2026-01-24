@@ -110,15 +110,45 @@ ProcessWorkItemWithRetries (parent span)
 
 ## Running the Example
 
+### Option 1: With Full Observability Stack (Docker Compose) - Recommended
+
+Run with OpenTelemetry Collector, Jaeger, Prometheus, and Grafana:
+
 ```bash
-dotnet run --project examples/AdvancedExample
+# Quick start with helper script
+./start-observability.sh
+
+# Or manually
+docker compose up --build
 ```
+
+This will start:
+- ✅ The .NET application with OTLP exporters
+- ✅ OpenTelemetry Collector (receives telemetry)
+- ✅ **Seq** (http://localhost:5341) - **Simple log viewer** (recommended starting point!)
+- ✅ Jaeger (http://localhost:16686) for viewing traces
+- ✅ Prometheus (http://localhost:9090) for querying metrics
+- ✅ Grafana (http://localhost:3000) for unified dashboards
+
+**See [DOCKER.md](DOCKER.md) for detailed documentation.**
+
+### Option 2: Local Development (Console Exporters)
+
+Run locally without Docker for quick testing:
+
+```bash
+dotnet run
+```
+
+The application automatically detects if OTLP is configured and falls back to console exporters.
+
+### What the Application Does
 
 The application will:
 1. Initialize bootstrap logging
 2. Run startup validation checks
 3. Configure and start services
-4. Process work items with error handling
+4. Process work items with error handling and distributed tracing
 5. Report health metrics
 6. Handle graceful shutdown on Ctrl+C
 
@@ -138,44 +168,46 @@ Modify `WorkerOptions` in Program.cs:
 - `EnableValidation`: Toggle validation pipeline
 
 ### OpenTelemetry Exporters
-The example uses console exporters for demonstration. To export to a collector:
 
-**Replace console exporters with OTLP:**
+The application **automatically switches between OTLP and console exporters** based on the environment:
+
+- **With Docker Compose**: Uses OTLP exporters to send data to the OpenTelemetry Collector
+- **Local development**: Uses console exporters for quick debugging
+
+The switching logic:
 ```csharp
-// For Logging (in bootstrap logger configuration)
-builder.AddOpenTelemetry(options =>
+var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+if (!string.IsNullOrEmpty(otlpEndpoint))
 {
-    // ... resource configuration ...
-    options.AddOtlpExporter(); // Instead of AddConsoleExporter()
-});
-
-// For Tracing and Metrics (in main application)
-builder.Services.AddOpenTelemetry()
-    .WithTracing(tracing => tracing
-        .AddSource("AdvancedExample")
-        .AddOtlpExporter()) // Instead of AddConsoleExporter()
-    .WithMetrics(metrics => metrics
-        .AddRuntimeInstrumentation()
-        .AddOtlpExporter()); // Instead of AddConsoleExporter()
+    options.AddOtlpExporter(); // Production/Docker mode
+}
+else
+{
+    options.AddConsoleExporter(); // Local development mode
+}
 ```
 
 **Configure OTLP endpoint** (via environment variables):
 ```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317"
-export OTEL_EXPORTER_OTLP_PROTOCOL="grpc"
-```
-
-Or in code:
-```csharp
-options.AddOtlpExporter(otlpOptions =>
-{
-    otlpOptions.Endpoint = new Uri("http://localhost:4317");
-});
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
+export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+export OTEL_SERVICE_NAME="AdvancedExample"
 ```
 
 ### Popular Observability Backends
-- **Jaeger**: For distributed tracing
-- **Prometheus + Grafana**: For metrics and dashboards
+
+This example includes a full stack via Docker Compose:
+- ✅ **Seq**: Simple, searchable log viewer - perfect for viewing all logs and correlating with traces (included)
+- ✅ **Jaeger**: Distributed tracing UI (included)
+- ✅ **Prometheus**: Metrics storage and querying (included)
+- ✅ **Grafana**: Unified dashboards and visualization (included)
+- ✅ **OpenTelemetry Collector**: Vendor-agnostic telemetry pipeline (included)
+
+**Pro tip**: Start with Seq (http://localhost:5341) to see all your logs in one place. Click on any TraceId to correlate logs with traces in Jaeger!
+
+You can also export to cloud backends:
 - **Elastic Stack**: For logs, metrics, and APM
 - **Honeycomb**: SaaS observability platform
 - **Datadog**: Full-stack monitoring
+- **Azure Application Insights**: Microsoft cloud monitoring
+- **Google Cloud Trace**: GCP tracing and profiling

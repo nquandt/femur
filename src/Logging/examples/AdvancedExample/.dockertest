@@ -1,0 +1,17 @@
+#!/bin/bash
+# Quick Docker verification script
+# This file can be deleted - it's just for testing
+
+set -e
+
+echo "🧪 Testing Docker build..."
+docker build -f Dockerfile -t femur-logging-advanced-example:test ../../../../..
+
+echo ""
+echo "✅ Docker build successful!"
+echo ""
+echo "🧹 Cleaning up test image..."
+docker rmi femur-logging-advanced-example:test
+
+echo ""
+echo "✅ All tests passed!"

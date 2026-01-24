@@ -1,0 +1,29 @@
+# Directories
+**/bin/
+**/obj/
+**/out/
+**/TestResults/
+
+# Files
+**/*.user
+**/*.suo
+**/*.cache
+**/.vs/
+**/.vscode/
+**/.idea/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+**/Dockerfile*
+**/docker-compose*
+**/.dockerignore
+
+# Logs
+**/*.log
+
+# Build outputs
+**/publish/

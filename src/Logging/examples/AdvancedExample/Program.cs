@@ -40,8 +40,17 @@ using var logger = BootstrapLogger.Create<Program>(
             options.IncludeScopes = true;
             options.ParseStateValues = true;
 
-            // Export to console for demonstration
-            options.AddConsoleExporter();
+            // Use OTLP exporter if endpoint is configured, otherwise fallback to console
+            var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+            if (!string.IsNullOrEmpty(otlpEndpoint))
+            {
+                options.AddOtlpExporter();
+            }
+            else
+            {
+                // Export to console for local development
+                options.AddConsoleExporter();
+            }
         });
     },
     services =>
@@ -82,15 +91,40 @@ try
     builder.Services.AddBootstrappedLogging(logger);
 
     // Add OpenTelemetry tracing and metrics using shared ResourceBuilder
+    var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+    var useOtlp = !string.IsNullOrEmpty(otlpEndpoint);
+
     builder.Services.AddOpenTelemetry()
-        .WithTracing(tracing => tracing
-            .SetResourceBuilder(resourceBuilder)
-            .AddSource(serviceName)
-            .AddConsoleExporter())
-        .WithMetrics(metrics => metrics
-            .SetResourceBuilder(resourceBuilder)
-            .AddRuntimeInstrumentation()
-            .AddConsoleExporter());
+        .WithTracing(tracing =>
+        {
+            tracing
+                .SetResourceBuilder(resourceBuilder)
+                .AddSource(serviceName);
+
+            if (useOtlp)
+            {
+                tracing.AddOtlpExporter();
+            }
+            else
+            {
+                tracing.AddConsoleExporter();
+            }
+        })
+        .WithMetrics(metrics =>
+        {
+            metrics
+                .SetResourceBuilder(resourceBuilder)
+                .AddRuntimeInstrumentation();
+
+            if (useOtlp)
+            {
+                metrics.AddOtlpExporter();
+            }
+            else
+            {
+                metrics.AddConsoleExporter();
+            }
+        });
 
     // Register services
     // Note: ActivitySource is already registered in the bootstrap container
