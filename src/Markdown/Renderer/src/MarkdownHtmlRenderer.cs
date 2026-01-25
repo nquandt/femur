@@ -269,8 +269,17 @@ public class MarkdownHtmlRenderer : MarkdownAstWalker
 
         _ = this._output.Append('>');
 
-        // Walk children
-        this.WalkChildren(node);
+        // Walk children if present, otherwise render rawContent
+        if (node.HasChildren)
+        {
+            this.WalkChildren(node);
+        }
+        else if (!string.IsNullOrEmpty(node.RawContent))
+        {
+            // For tags with colon convention (e.g., C:Codeblock) that skip parsing,
+            // render the raw content as escaped text
+            _ = this._output.Append(EscapeHtml(node.RawContent));
+        }
 
         // Render closing tag
         _ = this._output.Append($"</{tagName}>");

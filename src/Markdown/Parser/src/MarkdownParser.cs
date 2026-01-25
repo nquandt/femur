@@ -640,6 +640,38 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         return true;
     }
 
+    /// <summary>
+    /// Checks if a line is a thematic break (at least 3 of the same marker with optional spaces).
+    /// </summary>
+    private bool IsThematicBreakLine(string line, char marker)
+    {
+        if (line.Length < 3)
+        {
+            return false;
+        }
+
+        if (marker != '-' && marker != '*' && marker != '_')
+        {
+            return false;
+        }
+
+        // All characters must be the same marker (with optional spaces/tabs)
+        var count = 0;
+        foreach (var ch in line)
+        {
+            if (ch == marker)
+            {
+                count++;
+            }
+            else if (!char.IsWhiteSpace(ch))
+            {
+                return false;
+            }
+        }
+
+        return count >= 3;
+    }
+
     private bool TryParseFencedCodeBlock(string line, int lineIndex, ref int currentIndex, out CodeBlockNode? codeBlock)
     {
         codeBlock = null;
@@ -897,9 +929,10 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         }
 
         // Parse the div content recursively (it can contain any blocks)
+        // Tags with colons (e.g., "C:Codeblock") are treated as literal content containers
+        // and skip inner markdown parsing
         var contentStr = string.Join("\n", divContent);
-        var parser = new MarkdownParser(new MemoryStream(Encoding.UTF8.GetBytes(contentStr)));
-        var contentDoc = parser.Parse();
+        var shouldParseContent = string.IsNullOrEmpty(name) || !name.Contains(':');
 
         fencedDiv = new FencedDivNode
         {
@@ -910,13 +943,20 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             Location = new SourceLocation(0, divContent.Count, lineIndex + 1, 1)
         };
 
-        // Copy parsed content from the temporary document to the fenced div
-        if (contentDoc.HasChildren)
+        // Only parse inner content for non-literal tags (tags without colons)
+        if (shouldParseContent)
         {
-            foreach (var child in contentDoc.Children)
+            var parser = new MarkdownParser(new MemoryStream(Encoding.UTF8.GetBytes(contentStr)));
+            var contentDoc = parser.Parse();
+
+            // Copy parsed content from the temporary document to the fenced div
+            if (contentDoc.HasChildren)
             {
-                child.SetParent(fencedDiv);
-                fencedDiv.Children.Add(child);
+                foreach (var child in contentDoc.Children)
+                {
+                    child.SetParent(fencedDiv);
+                    fencedDiv.Children.Add(child);
+                }
             }
         }
 
@@ -1236,6 +1276,13 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             return false;
         }
 
+        // Check if this is actually a thematic break (e.g., "* * *", "- - -")
+        // A thematic break requires at least 3 of the same character with only spaces between them
+        if (!isOrdered && this.IsThematicBreakLine(trimmed, bulletChar))
+        {
+            return false; // Not a list, it's a thematic break
+        }
+
         list = new ListNode
         {
             IsOrdered = isOrdered,
@@ -1272,12 +1319,21 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
 
                     if (numEnd < currentTrimmed.Length && (currentTrimmed[numEnd] == '.' || currentTrimmed[numEnd] == ')'))
                     {
-                        isListItem = true;
+                        // Check for whitespace after marker
+                        var markerEnd = numEnd + 1;
+                        if (markerEnd < currentTrimmed.Length && char.IsWhiteSpace(currentTrimmed[markerEnd]))
+                        {
+                            isListItem = true;
+                        }
                     }
                 }
                 else if (!isOrdered && (currentTrimmed[0] == '-' || currentTrimmed[0] == '*' || currentTrimmed[0] == '+'))
                 {
-                    isListItem = true;
+                    // Check for whitespace after marker
+                    if (currentTrimmed.Length > 1 && char.IsWhiteSpace(currentTrimmed[1]))
+                    {
+                        isListItem = true;
+                    }
                 }
             }
 
@@ -2205,23 +2261,27 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                 }
             }
 
-            // Emphasis: *text* or _text_ - using CommonMark full delimiter stack algorithm
+            // Emphasis: *text* or _text* - using CommonMark full delimiter stack algorithm
             if (text[i] == '*' || text[i] == '_')
             {
-                // Flush current text
-                if (currentText.Length > 0)
-                {
-                    result.Add(new MarkdownTextNode { Content = currentText.ToString() });
-                    _ = currentText.Clear();
-                }
-
-                // Use improved emphasis parsing with full CommonMark support
+                // Try to parse emphasis first WITHOUT flushing
                 var consumed = this.TryParseEmphasisCommonMark(text, i, result, baseOffset, originalText);
                 if (consumed > 0)
                 {
+                    // Emphasis was successfully parsed
+                    // Flush current text BEFORE the emphasis node by inserting at the correct position
+                    if (currentText.Length > 0)
+                    {
+                        var textNode = new MarkdownTextNode { Content = currentText.ToString() };
+                        // Insert before the just-added emphasis node
+                        result.Insert(result.Count - 1, textNode);
+                        _ = currentText.Clear();
+                    }
+
                     i += consumed;
                     continue;
                 }
+                // If consumed == 0, fall through to append as literal character
             }
 
             // Autolinks: <http://example.com> or <user@example.com>
@@ -2766,12 +2826,24 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                 {
                     var node = new StrongEmphasisNode();
                     node.Children.AddRange(innerContent);
+                    // Set parent for all children
+                    foreach (var child in innerContent)
+                    {
+                        child.SetParent(node);
+                    }
+
                     emphasisNode = node;
                 }
                 else
                 {
                     var node = new EmphasisNode();
                     node.Children.AddRange(innerContent);
+                    // Set parent for all children
+                    foreach (var child in innerContent)
+                    {
+                        child.SetParent(node);
+                    }
+
                     emphasisNode = node;
                 }
 

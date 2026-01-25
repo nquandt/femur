@@ -1,0 +1,3282 @@
+{
+  "nodeType": "ExtendedDocument",
+  "location": {
+    "offset": 0,
+    "length": 0,
+    "line": 0,
+    "column": 0
+  },
+  "hasFrontMatter": true,
+  "children": [
+    {
+      "nodeType": "FrontMatterBlock",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 0,
+        "column": 0
+      },
+      "rawContent": "title: \u0022IOptions FluentValidation at Startup\u0022\nslug: \u0022ioptions-fluentvalidation\u0022\nlang: en\ndescription: \u0022Move configuration validation to application startup using FluentValidation, catching errors before they reach your controllers.\u0022",
+      "parsedData": {
+        "title": "IOptions FluentValidation at Startup",
+        "slug": "ioptions-fluentvalidation",
+        "lang": "en",
+        "description": "Move configuration validation to application startup using FluentValidation, catching errors before they reach your controllers."
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 357,
+        "line": 2,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "ASP.NET Core\u2019s "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "IOptions\u003CT\u003E"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " pattern handles typed configuration well, but validation only happens when the DI container resolves those options. This means your application can start successfully with invalid configuration. Think missing API keys, malformed connection strings, out-of-range values. This means failures when code actually uses those options."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 249,
+        "line": 4,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "The following pattern moves validation to application startup using FluentValidation and "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "ValidateOnStart()"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": ". If configuration is invalid, the app refuses to start. Configuration errors become immediate startup failures instead of runtime surprises."
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 26,
+        "line": 6,
+        "column": 1
+      },
+      "level": 2,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "A Common Enough Example"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 49,
+        "line": 8,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Here\u2019s what a typical options pattern looks like:"
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 16,
+        "line": 10,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022}",
+      "rawContent": "public class EmailOptions\n{\n    public string SmtpServer { get; set; }\n    public int Port { get; set; }\n    public string ApiKey { get; set; }\n}\n\npublic class EmailService\n{\n    private readonly EmailOptions _options;\n    \n    public EmailService(IOptions\u003CEmailOptions\u003E options) // Validation triggers when IOptions resolves\n    {\n        _options = options.Value; // Often we\u0027d manually validate here\n    }\n}",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp"
+        }
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 231,
+        "line": 29,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Let\u2019s say "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "EmailService"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " only gets used by a notification endpoint. Maybe that endpoint doesn\u2019t get hit for hours after deployment. Maybe it\u2019s rarely used. Either way, your broken configuration sits there waiting to cause problems."
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 22,
+        "line": 31,
+        "column": 1
+      },
+      "level": 2,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Validate at Startup"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 162,
+        "line": 33,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "What if instead we didn\u2019t have to wait to find out our options are missing. If config is invalid, lets stop the app from starting. Move the validation to startup."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 213,
+        "line": 35,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "This is especially useful in Kubernetes or similar orchestrators. They\u2019ll automatically restart failed containers (if you have health checks setup). In fact, they won\u2019t roll out bad deployments in the first place."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 143,
+        "line": 37,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "The pattern combines FluentValidation with ASP.NET Core\u2019s "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "ValidateOnStart()"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": ". Validation runs during startup, before any HTTP requests arrive."
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 17,
+        "line": 39,
+        "column": 1
+      },
+      "level": 2,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Implementation"
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 19,
+        "line": 41,
+        "column": 1
+      },
+      "level": 3,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Core Interfaces"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 84,
+        "line": 43,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "First, you\u2019ll need some interfaces. These enforce a contract for all config classes:"
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 45,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022 filename=\u0022IStandardOptions.cs\u0022 rawUrl=\u0022~/files/articles/ioptions-fluentvalidation/IStandardOptions.cs\u0022}",
+      "rawContent": "",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp",
+          "filename": "IStandardOptions.cs",
+          "rawUrl": "~/files/articles/ioptions-fluentvalidation/IStandardOptions.cs"
+        }
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 180,
+        "line": 48,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "C# 11\u2019s static abstract members let us enforce this at compile time. Every config class must declare its section name. Every validatable config class must provide validation rules."
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 31,
+        "line": 50,
+        "column": 1
+      },
+      "level": 3,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Configuration Class Example"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 41,
+        "line": 52,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Here\u2019s what your config class looks like:"
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 23,
+        "line": 54,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022}",
+      "rawContent": "public class EmailOptions : IStandardOptionsWithValidation\u003CEmailOptions\u003E\n{\n    public static string SectionName =\u003E \u0022Email\u0022;\n    \n    public string SmtpServer { get; set; } = string.Empty;\n    public int Port { get; set; }\n    public string ApiKey { get; set; } = string.Empty;\n    \n    public static void SetupValidator(AbstractValidator\u003CEmailOptions\u003E validator)\n    {\n        validator.RuleFor(x =\u003E x.SmtpServer)\n            .NotEmpty()\n            .Must(x =\u003E Uri.CheckHostName(x) != UriHostNameType.Unknown)\n            .WithMessage(\u0022SmtpServer must be a valid hostname\u0022);\n            \n        validator.RuleFor(x =\u003E x.Port)\n            .InclusiveBetween(1, 65535);\n            \n        validator.RuleFor(x =\u003E x.ApiKey)\n            .NotEmpty()\n            .MinimumLength(32);\n    }\n}",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp"
+        }
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 44,
+        "line": 80,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Now wire it up with these extension methods:"
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 82,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022 filename=\u0022ServiceCollectionExtensions.cs\u0022 rawUrl=\u0022~/files/articles/ioptions-fluentvalidation/ServiceCollectionExtensions.cs\u0022}",
+      "rawContent": "",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp",
+          "filename": "ServiceCollectionExtensions.cs",
+          "rawUrl": "~/files/articles/ioptions-fluentvalidation/ServiceCollectionExtensions.cs"
+        }
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 172,
+        "line": 85,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "The first method does the heavy lifting. It registers the validator, binds your config, hooks up FluentValidation, and enables startup validation. One call does everything."
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 32,
+        "line": 87,
+        "column": 1
+      },
+      "level": 3,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "FluentValidation Integration"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 76,
+        "line": 89,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "This adapter translates FluentValidation results into what IOptions expects:"
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 91,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022 filename=\u0022FluentValidationOptions.cs\u0022 rawUrl=\u0022~/files/articles/ioptions-fluentvalidation/FluentValidationOptions.cs\u0022}",
+      "rawContent": "",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp",
+          "filename": "FluentValidationOptions.cs",
+          "rawUrl": "~/files/articles/ioptions-fluentvalidation/FluentValidationOptions.cs"
+        }
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 141,
+        "line": 94,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "When validation fails, you get clear error messages. No generic \u201Cinvalid configuration\u201D exceptions. Each property violation gets spelled out."
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 22,
+        "line": 96,
+        "column": 1
+      },
+      "level": 2,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Usage in Program.cs"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 19,
+        "line": 98,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Using it is simple:"
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 8,
+        "line": 100,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022}",
+      "rawContent": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddOptionsWithValidation\u003CEmailOptions\u003E();\n\nvar app = builder.Build();\n\n// Validation happens during Host.StartAsync() when you call app.Run()\napp.Run();",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp"
+        }
+      }
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 33,
+        "line": 111,
+        "column": 1
+      },
+      "level": 3,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "When Validation Actually Runs"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 135,
+        "line": 113,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Here\u2019s something that tripped me up at first. Validation doesn\u2019t happen during "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "builder.Build()"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": ". It happens when you call "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "app.Run()"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 155,
+        "line": 115,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Under the hood, "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "app.Run()"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " calls "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Host.StartAsync()"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": ". That\u2019s when "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "IStartupValidator"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " kicks in. Check the .NET Host source if you want to see the details."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 37,
+        "line": 117,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "The startup sequence looks like this:"
+        }
+      ]
+    },
+    {
+      "nodeType": "List",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 119,
+        "column": 1
+      },
+      "isOrdered": true,
+      "startNumber": 1,
+      "isLoose": false,
+      "children": [
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 119,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "CodeSpan",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "IHostLifetime.WaitForStartAsync"
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " - Host readiness check"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 120,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "CodeSpan",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "IStartupValidator.Validate()"
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " - Options validation (our code runs here)"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 121,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "CodeSpan",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "IHostedLifecycleService.StartingAsync"
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " - Pre-startup hooks"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 122,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "CodeSpan",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "IHostedService.StartAsync"
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " - Hosted services start"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 123,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "CodeSpan",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "IHostedLifecycleService.StartedAsync"
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " - Post-startup hooks"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 73,
+        "line": 125,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Validation runs early in startup. But not until the host actually starts."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 220,
+        "line": 127,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Note"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": ": .NET 9 changed how "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "IStartupValidator"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " works internally. Earlier versions behave differently. Check "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "OptionsBuilderExtensions.cs"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " in the dotnet/runtime repo to see how your version wires up "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "ValidateOnStart()"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "."
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 41,
+        "line": 129,
+        "column": 1
+      },
+      "level": 2,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Validating Earlier (Before Host Start)"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 238,
+        "line": 131,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Sometimes you want validation to happen even earlier. Maybe your orchestrator checks health before the app runs. Maybe you need validated config during initialization. Here\u2019s how I\u2019ve been actually using "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "IStartupValidator"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " in production:"
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 14,
+        "line": 133,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022}",
+      "rawContent": "var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddOptionsWithValidation\u003CEmailOptions\u003E();\n\nvar app = builder.Build();\n\n// Force validation right now\nvar validator = app.Services.GetService\u003CIStartupValidator\u003E();\nif (validator is not null)\n{\n    validator.Validate(); // Throws if config is invalid\n}\n\napp.Run();",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp"
+        }
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 25,
+        "line": 150,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "When you\u2019d want this:"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "List",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 152,
+        "column": 1
+      },
+      "isOrdered": false,
+      "bulletChar": "-",
+      "isLoose": false,
+      "children": [
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 152,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Container health checks - Orchestrator pings before your app runs"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 153,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Initialization dependencies - You need config before "
+                },
+                {
+                  "nodeType": "CodeSpan",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Run()"
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " executes"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 154,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Fast feedback - See errors immediately in logs"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 27,
+        "line": 156,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Trade-offs to consider:"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 170,
+        "line": 158,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Validation runs twice. Once manually, once during "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "StartAsync()"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": ". Usually negligible. But if validation relies on hosted services, the early check might fail incorrectly."
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 62,
+        "line": 160,
+        "column": 1
+      },
+      "level": 3,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Alternative: Build ServiceProvider Twice (Not Recommended)"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 87,
+        "line": 162,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Some folks try building a temporary "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "ServiceProvider"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " before calling "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "builder.Build()"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": ":"
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 7,
+        "line": 164,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022}",
+      "rawContent": "// \u26A0\uFE0F DON\u0027T DO THIS\nvar tempSp = builder.Services.BuildServiceProvider();\nvar validator = tempSp.GetService\u003CIStartupValidator\u003E();\nvalidator?.Validate();\n\nvar app = builder.Build(); // Builds service provider again\napp.Run();",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp"
+        }
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 23,
+        "line": 174,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Why this breaks things:"
+        }
+      ]
+    },
+    {
+      "nodeType": "List",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 176,
+        "column": 1
+      },
+      "isOrdered": false,
+      "bulletChar": "-",
+      "isLoose": false,
+      "children": [
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 176,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Double initialization - Singletons get created twice"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 177,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Wasted resources - Building service providers is expensive"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 178,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Inconsistent behavior - Services might act differently between providers"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 179,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Framework warnings - ASP.NET Core explicitly discourages calling "
+                },
+                {
+                  "nodeType": "CodeSpan",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "BuildServiceProvider()"
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " directly"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 90,
+        "line": 181,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Better approach"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": ": Validate manually after "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "app.Build()"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " if you need earlier validation."
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 17,
+        "line": 183,
+        "column": 1
+      },
+      "level": 2,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Why This Helps"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 122,
+        "line": 185,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Containers fail to start"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " - Bad config prevents pods from becoming ready in Kubernetes. Bad deployments don\u2019t roll out."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 103,
+        "line": 187,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Local development is clearer"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " - Errors show up at startup. No more hunting through logs hours later."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 136,
+        "line": 189,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Production stays safe"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " - Config drift gets caught before any requests arrive. Missing environment variables? You\u2019ll know immediately."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 126,
+        "line": 191,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Error messages make sense"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " - FluentValidation gives you property-level details. Not vague \u201Cinvalid configuration\u201D messages."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 131,
+        "line": 193,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Proper lifecycle integration"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " - Uses "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "IStartupValidator"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " so validation happens after DI builds but before hosted services start."
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 30,
+        "line": 195,
+        "column": 1
+      },
+      "level": 2,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "When You Shouldn\u2019t Use This"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 56,
+        "line": 197,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Sometimes strict startup validation isn\u2019t what you want:"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 114,
+        "line": 199,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Multi-tenant apps"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " - One tenant\u2019s bad config shouldn\u2019t kill the whole application. Validate per-tenant instead."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 149,
+        "line": 201,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Graceful degradation"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " - Maybe your app works fine without email. If sending notifications is optional, don\u2019t fail startup for missing SMTP config."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 228,
+        "line": 203,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Monolithic services"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " - If one app handles multiple concerns (web API \u002B background worker), valid config for one part shouldn\u2019t require valid config for both. Though honestly, this usually means you should split your services."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 123,
+        "line": 205,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Development environments"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " - Sometimes you want the app to run even with incomplete config. Use conditional registration:"
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 9,
+        "line": 207,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022}",
+      "rawContent": "if (builder.Environment.IsProduction())\n{\n    builder.Services.AddOptionsWithValidation\u003CEmailOptions\u003E();\n}\nelse\n{\n    builder.Services.AddOptions\u003CEmailOptions\u003E()\n        .BindConfiguration(EmailOptions.SectionName);\n}",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp"
+        }
+      }
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 38,
+        "line": 219,
+        "column": 1
+      },
+      "level": 2,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Configuration vs. Dependency Health"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 50,
+        "line": 221,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Don\u2019t confuse these two things. They\u2019re different."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 62,
+        "line": 223,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Configuration validation"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " asks: \u201CIs my config well-formed?\u201D"
+        }
+      ]
+    },
+    {
+      "nodeType": "List",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 225,
+        "column": 1
+      },
+      "isOrdered": false,
+      "bulletChar": "-",
+      "isLoose": false,
+      "children": [
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 225,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Is the SMTP port between 1 and 65535?"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 226,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Is the API key at least 32 characters?"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 227,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Is the connection string format valid?"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 65,
+        "line": 229,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "Dependency health checks"
+            }
+          ]
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " ask: \u201CCan I reach external systems?\u201D"
+        }
+      ]
+    },
+    {
+      "nodeType": "List",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 231,
+        "column": 1
+      },
+      "isOrdered": false,
+      "bulletChar": "-",
+      "isLoose": false,
+      "children": [
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 231,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Can I connect to the database?"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 232,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Is the external API responding?"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 233,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Does the SMTP server accept my credentials?"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 38,
+        "line": 235,
+        "column": 1
+      },
+      "level": 3,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Use Health Checks for Connectivity"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 110,
+        "line": 237,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "For checking external dependencies, use ASP.NET Core\u2019s Health Checks. Don\u2019t abuse options validation for this:"
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 17,
+        "line": 239,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022}",
+      "rawContent": "var builder = WebApplication.CreateBuilder(args);\n\n// Validate config structure\nbuilder.Services.AddOptionsWithValidation\u003CEmailOptions\u003E();\nbuilder.Services.AddOptionsWithValidation\u003CDatabaseOptions\u003E();\n\n// Check external dependencies\nbuilder.Services.AddHealthChecks()\n    .AddCheck\u003CDatabaseHealthCheck\u003E(\u0022database\u0022)\n    .AddCheck\u003CEmailServiceHealthCheck\u003E(\u0022email\u0022)\n    .AddNpgSql(builder.Configuration.GetConnectionString(\u0022Default\u0022)!)\n    .AddUrlGroup(new Uri(\u0022https://api.external.com/health\u0022), \u0022external-api\u0022);\n\nvar app = builder.Build();\n\napp.MapHealthChecks(\u0022/health\u0022);\napp.Run();",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp"
+        }
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 38,
+        "line": 259,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Here\u2019s what a health check looks like:"
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 27,
+        "line": 261,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022}",
+      "rawContent": "public class EmailServiceHealthCheck : IHealthCheck\n{\n    private readonly IOptions\u003CEmailOptions\u003E _options;\n    \n    public EmailServiceHealthCheck(IOptions\u003CEmailOptions\u003E options)\n    {\n        _options = options;\n    }\n    \n    public async Task\u003CHealthCheckResult\u003E CheckHealthAsync(\n        HealthCheckContext context,\n        CancellationToken cancellationToken = default)\n    {\n        try\n        {\n            using var client = new SmtpClient(_options.Value.SmtpServer, _options.Value.Port);\n            await client.ConnectAsync(cancellationToken);\n            await client.DisconnectAsync(true, cancellationToken);\n            \n            return HealthCheckResult.Healthy(\u0022Email service is reachable\u0022);\n        }\n        catch (Exception ex)\n        {\n            return HealthCheckResult.Unhealthy(\u0022Email service is unreachable\u0022, ex);\n        }\n    }\n}",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp"
+        }
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 30,
+        "line": 291,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Why health checks work better:"
+        }
+      ]
+    },
+    {
+      "nodeType": "List",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 293,
+        "column": 1
+      },
+      "isOrdered": false,
+      "bulletChar": "-",
+      "isLoose": false,
+      "children": [
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 293,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "StrongEmphasis",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "children": [
+                    {
+                      "nodeType": "Text",
+                      "location": {
+                        "offset": 0,
+                        "length": 0,
+                        "line": 0,
+                        "column": 0
+                      },
+                      "content": "Separation of concerns"
+                    }
+                  ]
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " - Config validation at startup. Health checks run continuously."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 294,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "StrongEmphasis",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "children": [
+                    {
+                      "nodeType": "Text",
+                      "location": {
+                        "offset": 0,
+                        "length": 0,
+                        "line": 0,
+                        "column": 0
+                      },
+                      "content": "Orchestrator integration"
+                    }
+                  ]
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " - Kubernetes speaks health check natively."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 295,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "StrongEmphasis",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "children": [
+                    {
+                      "nodeType": "Text",
+                      "location": {
+                        "offset": 0,
+                        "length": 0,
+                        "line": 0,
+                        "column": 0
+                      },
+                      "content": "Rich reporting"
+                    }
+                  ]
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " - Get detailed status info and custom metadata."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 296,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "StrongEmphasis",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "children": [
+                    {
+                      "nodeType": "Text",
+                      "location": {
+                        "offset": 0,
+                        "length": 0,
+                        "line": 0,
+                        "column": 0
+                      },
+                      "content": "Non-blocking"
+                    }
+                  ]
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " - Failed health checks report degraded state. They don\u2019t prevent startup."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 297,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "StrongEmphasis",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "children": [
+                    {
+                      "nodeType": "Text",
+                      "location": {
+                        "offset": 0,
+                        "length": 0,
+                        "line": 0,
+                        "column": 0
+                      },
+                      "content": "Ongoing monitoring"
+                    }
+                  ]
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " - Run on a schedule to catch issues that develop after deployment."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 22,
+        "line": 299,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "StrongEmphasis",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "children": [
+            {
+              "nodeType": "Text",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "content": "When to use which:"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 185,
+        "line": 301,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Startup validation for config that must be correct. Health checks for dependencies that might be temporarily down but shouldn\u2019t block startup. Think circuit breakers and retry policies."
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 14,
+        "line": 303,
+        "column": 1
+      },
+      "level": 2,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Wrapping Up"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 173,
+        "line": 305,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "This pattern moves config validation from \u201Cruntime surprise\u201D to \u201Cstartup safety.\u201D FluentValidation plus "
+        },
+        {
+          "nodeType": "CodeSpan",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "ValidateOnStart()"
+        },
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": " catches broken config before any requests arrive."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 201,
+        "line": 307,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "It\u2019s especially useful in containerized environments. Fast failures enable automated recovery. But it works just as well in traditional deployments. Clear early errors beat mysterious runtime failures."
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 148,
+        "line": 309,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Think about your specific needs. Strict validation helps most apps. But it\u2019s not universal. Apply it where it makes sense. Skip it where it doesn\u2019t."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+<p>ASP.NET Core&#39;s <code>IOptions&lt;T&gt;</code> pattern handles typed configuration well, but validation only happens when the DI container resolves those options. This means your application can start successfully with invalid configuration. Think missing API keys, malformed connection strings, out-of-range values. This means failures when code actually uses those options.</p><p>The following pattern moves validation to application startup using FluentValidation and <code>ValidateOnStart()</code>. If configuration is invalid, the app refuses to start. Configuration errors become immediate startup failures instead of runtime surprises.</p><h2>A Common Enough Example</h2><p>Here&#39;s what a typical options pattern looks like:</p><C:Codeblock lang="csharp">public class EmailOptions
+{
+    public string SmtpServer { get; set; }
+    public int Port { get; set; }
+    public string ApiKey { get; set; }
+}
+
+public class EmailService
+{
+    private readonly EmailOptions _options;
+    
+    public EmailService(IOptions&lt;EmailOptions&gt; options) // Validation triggers when IOptions resolves
+    {
+        _options = options.Value; // Often we&#39;d manually validate here
+    }
+}</C:Codeblock><p>Let&#39;s say <code>EmailService</code> only gets used by a notification endpoint. Maybe that endpoint doesn&#39;t get hit for hours after deployment. Maybe it&#39;s rarely used. Either way, your broken configuration sits there waiting to cause problems.</p><h2>Validate at Startup</h2><p>What if instead we didn&#39;t have to wait to find out our options are missing. If config is invalid, lets stop the app from starting. Move the validation to startup.</p><p>This is especially useful in Kubernetes or similar orchestrators. They&#39;ll automatically restart failed containers (if you have health checks setup). In fact, they won&#39;t roll out bad deployments in the first place.</p><p>The pattern combines FluentValidation with ASP.NET Core&#39;s <code>ValidateOnStart()</code>. Validation runs during startup, before any HTTP requests arrive.</p><h2>Implementation</h2><h3>Core Interfaces</h3><p>First, you&#39;ll need some interfaces. These enforce a contract for all config classes:</p><C:Codeblock lang="csharp" filename="IStandardOptions.cs" rawUrl="~/files/articles/ioptions-fluentvalidation/IStandardOptions.cs"></C:Codeblock><p>C# 11&#39;s static abstract members let us enforce this at compile time. Every config class must declare its section name. Every validatable config class must provide validation rules.</p><h3>Configuration Class Example</h3><p>Here&#39;s what your config class looks like:</p><C:Codeblock lang="csharp">public class EmailOptions : IStandardOptionsWithValidation&lt;EmailOptions&gt;
+{
+    public static string SectionName =&gt; &quot;Email&quot;;
+    
+    public string SmtpServer { get; set; } = string.Empty;
+    public int Port { get; set; }
+    public string ApiKey { get; set; } = string.Empty;
+    
+    public static void SetupValidator(AbstractValidator&lt;EmailOptions&gt; validator)
+    {
+        validator.RuleFor(x =&gt; x.SmtpServer)
+            .NotEmpty()
+            .Must(x =&gt; Uri.CheckHostName(x) != UriHostNameType.Unknown)
+            .WithMessage(&quot;SmtpServer must be a valid hostname&quot;);
+            
+        validator.RuleFor(x =&gt; x.Port)
+            .InclusiveBetween(1, 65535);
+            
+        validator.RuleFor(x =&gt; x.ApiKey)
+            .NotEmpty()
+            .MinimumLength(32);
+    }
+}</C:Codeblock><p>Now wire it up with these extension methods:</p><C:Codeblock lang="csharp" filename="ServiceCollectionExtensions.cs" rawUrl="~/files/articles/ioptions-fluentvalidation/ServiceCollectionExtensions.cs"></C:Codeblock><p>The first method does the heavy lifting. It registers the validator, binds your config, hooks up FluentValidation, and enables startup validation. One call does everything.</p><h3>FluentValidation Integration</h3><p>This adapter translates FluentValidation results into what IOptions expects:</p><C:Codeblock lang="csharp" filename="FluentValidationOptions.cs" rawUrl="~/files/articles/ioptions-fluentvalidation/FluentValidationOptions.cs"></C:Codeblock><p>When validation fails, you get clear error messages. No generic &quot;invalid configuration&quot; exceptions. Each property violation gets spelled out.</p><h2>Usage in Program.cs</h2><p>Using it is simple:</p><C:Codeblock lang="csharp">var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddOptionsWithValidation&lt;EmailOptions&gt;();
+
+var app = builder.Build();
+
+// Validation happens during Host.StartAsync() when you call app.Run()
+app.Run();</C:Codeblock><h3>When Validation Actually Runs</h3><p>Here&#39;s something that tripped me up at first. Validation doesn&#39;t happen during <code>builder.Build()</code>. It happens when you call <code>app.Run()</code>.</p><p>Under the hood, <code>app.Run()</code> calls <code>Host.StartAsync()</code>. That&#39;s when <code>IStartupValidator</code> kicks in. Check the .NET Host source if you want to see the details.</p><p>The startup sequence looks like this:</p><ol><li><code>IHostLifetime.WaitForStartAsync</code> - Host readiness check</li><li><code>IStartupValidator.Validate()</code> - Options validation (our code runs here)</li><li><code>IHostedLifecycleService.StartingAsync</code> - Pre-startup hooks</li><li><code>IHostedService.StartAsync</code> - Hosted services start</li><li><code>IHostedLifecycleService.StartedAsync</code> - Post-startup hooks</li></ol><p>Validation runs early in startup. But not until the host actually starts.</p><p><strong>Note</strong>: .NET 9 changed how <code>IStartupValidator</code> works internally. Earlier versions behave differently. Check <code>OptionsBuilderExtensions.cs</code> in the dotnet/runtime repo to see how your version wires up <code>ValidateOnStart()</code>.</p><h2>Validating Earlier (Before Host Start)</h2><p>Sometimes you want validation to happen even earlier. Maybe your orchestrator checks health before the app runs. Maybe you need validated config during initialization. Here&#39;s how I&#39;ve been actually using <code>IStartupValidator</code> in production:</p><C:Codeblock lang="csharp">var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddOptionsWithValidation&lt;EmailOptions&gt;();
+
+var app = builder.Build();
+
+// Force validation right now
+var validator = app.Services.GetService&lt;IStartupValidator&gt;();
+if (validator is not null)
+{
+    validator.Validate(); // Throws if config is invalid
+}
+
+app.Run();</C:Codeblock><p><strong>When you&#39;d want this:</strong></p><ul><li>Container health checks - Orchestrator pings before your app runs</li><li>Initialization dependencies - You need config before <code>Run()</code> executes</li><li>Fast feedback - See errors immediately in logs</li></ul><p><strong>Trade-offs to consider:</strong></p><p>Validation runs twice. Once manually, once during <code>StartAsync()</code>. Usually negligible. But if validation relies on hosted services, the early check might fail incorrectly.</p><h3>Alternative: Build ServiceProvider Twice (Not Recommended)</h3><p>Some folks try building a temporary <code>ServiceProvider</code> before calling <code>builder.Build()</code>:</p><C:Codeblock lang="csharp">// ⚠️ DON&#39;T DO THIS
+var tempSp = builder.Services.BuildServiceProvider();
+var validator = tempSp.GetService&lt;IStartupValidator&gt;();
+validator?.Validate();
+
+var app = builder.Build(); // Builds service provider again
+app.Run();</C:Codeblock><p>Why this breaks things:</p><ul><li>Double initialization - Singletons get created twice</li><li>Wasted resources - Building service providers is expensive</li><li>Inconsistent behavior - Services might act differently between providers</li><li>Framework warnings - ASP.NET Core explicitly discourages calling <code>BuildServiceProvider()</code> directly</li></ul><p><strong>Better approach</strong>: Validate manually after <code>app.Build()</code> if you need earlier validation.</p><h2>Why This Helps</h2><p><strong>Containers fail to start</strong> - Bad config prevents pods from becoming ready in Kubernetes. Bad deployments don&#39;t roll out.</p><p><strong>Local development is clearer</strong> - Errors show up at startup. No more hunting through logs hours later.</p><p><strong>Production stays safe</strong> - Config drift gets caught before any requests arrive. Missing environment variables? You&#39;ll know immediately.</p><p><strong>Error messages make sense</strong> - FluentValidation gives you property-level details. Not vague &quot;invalid configuration&quot; messages.</p><p><strong>Proper lifecycle integration</strong> - Uses <code>IStartupValidator</code> so validation happens after DI builds but before hosted services start.</p><h2>When You Shouldn&#39;t Use This</h2><p>Sometimes strict startup validation isn&#39;t what you want:</p><p><strong>Multi-tenant apps</strong> - One tenant&#39;s bad config shouldn&#39;t kill the whole application. Validate per-tenant instead.</p><p><strong>Graceful degradation</strong> - Maybe your app works fine without email. If sending notifications is optional, don&#39;t fail startup for missing SMTP config.</p><p><strong>Monolithic services</strong> - If one app handles multiple concerns (web API + background worker), valid config for one part shouldn&#39;t require valid config for both. Though honestly, this usually means you should split your services.</p><p><strong>Development environments</strong> - Sometimes you want the app to run even with incomplete config. Use conditional registration:</p><C:Codeblock lang="csharp">if (builder.Environment.IsProduction())
+{
+    builder.Services.AddOptionsWithValidation&lt;EmailOptions&gt;();
+}
+else
+{
+    builder.Services.AddOptions&lt;EmailOptions&gt;()
+        .BindConfiguration(EmailOptions.SectionName);
+}</C:Codeblock><h2>Configuration vs. Dependency Health</h2><p>Don&#39;t confuse these two things. They&#39;re different.</p><p><strong>Configuration validation</strong> asks: &quot;Is my config well-formed?&quot;</p><ul><li>Is the SMTP port between 1 and 65535?</li><li>Is the API key at least 32 characters?</li><li>Is the connection string format valid?</li></ul><p><strong>Dependency health checks</strong> ask: &quot;Can I reach external systems?&quot;</p><ul><li>Can I connect to the database?</li><li>Is the external API responding?</li><li>Does the SMTP server accept my credentials?</li></ul><h3>Use Health Checks for Connectivity</h3><p>For checking external dependencies, use ASP.NET Core&#39;s Health Checks. Don&#39;t abuse options validation for this:</p><C:Codeblock lang="csharp">var builder = WebApplication.CreateBuilder(args);
+
+// Validate config structure
+builder.Services.AddOptionsWithValidation&lt;EmailOptions&gt;();
+builder.Services.AddOptionsWithValidation&lt;DatabaseOptions&gt;();
+
+// Check external dependencies
+builder.Services.AddHealthChecks()
+    .AddCheck&lt;DatabaseHealthCheck&gt;(&quot;database&quot;)
+    .AddCheck&lt;EmailServiceHealthCheck&gt;(&quot;email&quot;)
+    .AddNpgSql(builder.Configuration.GetConnectionString(&quot;Default&quot;)!)
+    .AddUrlGroup(new Uri(&quot;https://api.external.com/health&quot;), &quot;external-api&quot;);
+
+var app = builder.Build();
+
+app.MapHealthChecks(&quot;/health&quot;);
+app.Run();</C:Codeblock><p>Here&#39;s what a health check looks like:</p><C:Codeblock lang="csharp">public class EmailServiceHealthCheck : IHealthCheck
+{
+    private readonly IOptions&lt;EmailOptions&gt; _options;
+    
+    public EmailServiceHealthCheck(IOptions&lt;EmailOptions&gt; options)
+    {
+        _options = options;
+    }
+    
+    public async Task&lt;HealthCheckResult&gt; CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var client = new SmtpClient(_options.Value.SmtpServer, _options.Value.Port);
+            await client.ConnectAsync(cancellationToken);
+            await client.DisconnectAsync(true, cancellationToken);
+            
+            return HealthCheckResult.Healthy(&quot;Email service is reachable&quot;);
+        }
+        catch (Exception ex)
+        {
+            return HealthCheckResult.Unhealthy(&quot;Email service is unreachable&quot;, ex);
+        }
+    }
+}</C:Codeblock><p>Why health checks work better:</p><ul><li><strong>Separation of concerns</strong> - Config validation at startup. Health checks run continuously.</li><li><strong>Orchestrator integration</strong> - Kubernetes speaks health check natively.</li><li><strong>Rich reporting</strong> - Get detailed status info and custom metadata.</li><li><strong>Non-blocking</strong> - Failed health checks report degraded state. They don&#39;t prevent startup.</li><li><strong>Ongoing monitoring</strong> - Run on a schedule to catch issues that develop after deployment.</li></ul><p><strong>When to use which:</strong></p><p>Startup validation for config that must be correct. Health checks for dependencies that might be temporarily down but shouldn&#39;t block startup. Think circuit breakers and retry policies.</p><h2>Wrapping Up</h2><p>This pattern moves config validation from &quot;runtime surprise&quot; to &quot;startup safety.&quot; FluentValidation plus <code>ValidateOnStart()</code> catches broken config before any requests arrive.</p><p>It&#39;s especially useful in containerized environments. Fast failures enable automated recovery. But it works just as well in traditional deployments. Clear early errors beat mysterious runtime failures.</p><p>Think about your specific needs. Strict validation helps most apps. But it&#39;s not universal. Apply it where it makes sense. Skip it where it doesn&#39;t.</p>

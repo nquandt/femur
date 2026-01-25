@@ -239,9 +239,9 @@ I am warning text
         Assert.Equal("C:Codeblock", div.Tag);
         Assert.Equal("{lang=\"csharp\"}", div.Attributes);
         Assert.Equal("csharp", div.ParsedAttributes.KeyValueAttributes["lang"]);
-        var codeBlock = div.Children.OfType<CodeBlockNode>().FirstOrDefault();
-        Assert.NotNull(codeBlock);
-        Assert.Contains("public static void main() {}", codeBlock.Content);
+        // C:Codeblock uses colon convention - no parsing, only rawContent
+        Assert.False(div.HasChildren);
+        Assert.Contains("public static void main() {}", div.RawContent);
     }
 
     [Fact]

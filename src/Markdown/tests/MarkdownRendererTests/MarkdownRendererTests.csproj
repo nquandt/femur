@@ -21,10 +21,18 @@
     <ProjectReference Include="../../Abstractions/src/Femur.Markdown.Abstractions.csproj" />
     <ProjectReference Include="../../Parser/src/Femur.Markdown.Parser.csproj" />
     <ProjectReference Include="../../Renderer/src/Femur.Markdown.Renderer.csproj" />
+    <ProjectReference Include="../../Extended/Abstractions/src/Femur.Markdown.Extended.Abstractions.csproj" />
+    <ProjectReference Include="../../Extended/Parser/src/Femur.Markdown.Extended.Parser.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../testfiles/**/*" LinkBase="testfiles">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -56,14 +56,13 @@ Some content here.
         Assert.NotNull(fencedDiv);
         Assert.Equal("C:Codeblock", fencedDiv.Tag);
         Assert.Equal("csharp", fencedDiv.ParsedAttributes.KeyValueAttributes["lang"]);
-        
-        // Check code block inside fenced div (indented code blocks have indentation stripped)
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().FirstOrDefault();
-        Assert.NotNull(codeBlock);
-        Assert.Contains("EmailOptions", codeBlock.Content);
-        Assert.Contains("SmtpServer", codeBlock.Content);
-        // Indentation is stripped, so "public class" should be at the start
-        Assert.Contains("public class EmailOptions", codeBlock.Content);
+
+        // C:Codeblock tags use colon convention - they don't parse children, only store rawContent
+        Assert.False(fencedDiv.HasChildren);
+        Assert.NotNull(fencedDiv.RawContent);
+        Assert.Contains("EmailOptions", fencedDiv.RawContent);
+        Assert.Contains("SmtpServer", fencedDiv.RawContent);
+        Assert.Contains("public class EmailOptions", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -101,12 +100,12 @@ title: Test
         // Assert
         var fencedDivs = document.Children.OfType<FencedDivNode>().ToList();
         Assert.Equal(2, fencedDivs.Count);
-        
+
         Assert.Equal("C:Codeblock", fencedDivs[0].Tag);
-        Assert.Contains("EmailOptions", fencedDivs[0].Children.OfType<CodeBlockNode>().First().Content);
-        
+        Assert.Contains("EmailOptions", fencedDivs[0].RawContent);
+
         Assert.Equal("C:Codeblock", fencedDivs[1].Tag);
-        Assert.Contains("EmailService", fencedDivs[1].Children.OfType<CodeBlockNode>().First().Content);
+        Assert.Contains("EmailService", fencedDivs[1].RawContent);
     }
 
     [Fact]
@@ -137,12 +136,12 @@ title: Interfaces
 
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().First();
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().First();
-        
-        Assert.Contains("IStandardOptions", codeBlock.Content);
-        Assert.Contains("IStandardOptionsWithValidation", codeBlock.Content);
-        Assert.Contains("static abstract", codeBlock.Content);
-        Assert.Contains("where TOptions", codeBlock.Content);
+        Assert.False(fencedDiv.HasChildren);
+
+        Assert.Contains("IStandardOptions", fencedDiv.RawContent);
+        Assert.Contains("IStandardOptionsWithValidation", fencedDiv.RawContent);
+        Assert.Contains("static abstract", fencedDiv.RawContent);
+        Assert.Contains("where TOptions", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -186,14 +185,14 @@ title: Configuration Class
 
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().First();
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().First();
-        
-        Assert.Contains("EmailOptions", codeBlock.Content);
-        Assert.Contains("IStandardOptionsWithValidation", codeBlock.Content);
-        Assert.Contains("SetupValidator", codeBlock.Content);
-        Assert.Contains("RuleFor", codeBlock.Content);
-        Assert.Contains("NotEmpty", codeBlock.Content);
-        Assert.Contains("InclusiveBetween", codeBlock.Content);
+        Assert.False(fencedDiv.HasChildren);
+
+        Assert.Contains("EmailOptions", fencedDiv.RawContent);
+        Assert.Contains("IStandardOptionsWithValidation", fencedDiv.RawContent);
+        Assert.Contains("SetupValidator", fencedDiv.RawContent);
+        Assert.Contains("RuleFor", fencedDiv.RawContent);
+        Assert.Contains("NotEmpty", fencedDiv.RawContent);
+        Assert.Contains("InclusiveBetween", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -246,14 +245,14 @@ title: Service Registration
 
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().First();
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().First();
-        
-        Assert.Contains("ServiceCollectionExtensions", codeBlock.Content);
-        Assert.Contains("AddOptionsWithValidation", codeBlock.Content);
-        Assert.Contains("ValidateFluentValidation", codeBlock.Content);
-        Assert.Contains("TryAddSingleton", codeBlock.Content);
-        Assert.Contains("BindConfiguration", codeBlock.Content);
-        Assert.Contains("ValidateOnStart", codeBlock.Content);
+        Assert.False(fencedDiv.HasChildren);
+
+        Assert.Contains("ServiceCollectionExtensions", fencedDiv.RawContent);
+        Assert.Contains("AddOptionsWithValidation", fencedDiv.RawContent);
+        Assert.Contains("ValidateFluentValidation", fencedDiv.RawContent);
+        Assert.Contains("TryAddSingleton", fencedDiv.RawContent);
+        Assert.Contains("BindConfiguration", fencedDiv.RawContent);
+        Assert.Contains("ValidateOnStart", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -317,14 +316,14 @@ title: FluentValidation Integration
 
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().First();
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().First();
-        
-        Assert.Contains("OptionsValidator", codeBlock.Content);
-        Assert.Contains("FluentValidationOptions", codeBlock.Content);
-        Assert.Contains("AbstractValidator", codeBlock.Content);
-        Assert.Contains("IValidateOptions", codeBlock.Content);
-        Assert.Contains("Validate", codeBlock.Content);
-        Assert.Contains("ValidateOptionsResult", codeBlock.Content);
+        Assert.False(fencedDiv.HasChildren);
+
+        Assert.Contains("OptionsValidator", fencedDiv.RawContent);
+        Assert.Contains("FluentValidationOptions", fencedDiv.RawContent);
+        Assert.Contains("AbstractValidator", fencedDiv.RawContent);
+        Assert.Contains("IValidateOptions", fencedDiv.RawContent);
+        Assert.Contains("Validate", fencedDiv.RawContent);
+        Assert.Contains("ValidateOptionsResult", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -354,12 +353,11 @@ title: Usage Example
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().FirstOrDefault();
         Assert.NotNull(fencedDiv);
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().FirstOrDefault();
-        Assert.NotNull(codeBlock);
-        Assert.Contains("WebApplication.CreateBuilder", codeBlock.Content);
-        Assert.Contains("AddOptionsWithValidation", codeBlock.Content);
-        Assert.Contains("builder.Build", codeBlock.Content);
-        Assert.Contains("app.Run", codeBlock.Content);
+        Assert.False(fencedDiv.HasChildren);
+        Assert.Contains("WebApplication.CreateBuilder", fencedDiv.RawContent);
+        Assert.Contains("AddOptionsWithValidation", fencedDiv.RawContent);
+        Assert.Contains("builder.Build", fencedDiv.RawContent);
+        Assert.Contains("app.Run", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -394,12 +392,12 @@ title: Early Validation
 
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().First();
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().First();
-        
-        Assert.Contains("GetService", codeBlock.Content);
-        Assert.Contains("IStartupValidator", codeBlock.Content);
-        Assert.Contains("validator.Validate", codeBlock.Content);
-        Assert.Contains("OptionsValidationException", codeBlock.Content);
+        Assert.False(fencedDiv.HasChildren);
+
+        Assert.Contains("GetService", fencedDiv.RawContent);
+        Assert.Contains("IStartupValidator", fencedDiv.RawContent);
+        Assert.Contains("validator.Validate", fencedDiv.RawContent);
+        Assert.Contains("OptionsValidationException", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -429,11 +427,11 @@ title: Conditional Registration
 
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().First();
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().First();
-        
-        Assert.Contains("IsProduction", codeBlock.Content);
-        Assert.Contains("AddOptionsWithValidation", codeBlock.Content);
-        Assert.Contains("BindConfiguration", codeBlock.Content);
+        Assert.False(fencedDiv.HasChildren);
+
+        Assert.Contains("IsProduction", fencedDiv.RawContent);
+        Assert.Contains("AddOptionsWithValidation", fencedDiv.RawContent);
+        Assert.Contains("BindConfiguration", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -471,13 +469,13 @@ title: Health Checks
 
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().First();
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().First();
-        
-        Assert.Contains("AddHealthChecks", codeBlock.Content);
-        Assert.Contains("AddCheck", codeBlock.Content);
-        Assert.Contains("AddNpgSql", codeBlock.Content);
-        Assert.Contains("AddUrlGroup", codeBlock.Content);
-        Assert.Contains("MapHealthChecks", codeBlock.Content);
+        Assert.False(fencedDiv.HasChildren);
+
+        Assert.Contains("AddHealthChecks", fencedDiv.RawContent);
+        Assert.Contains("AddCheck", fencedDiv.RawContent);
+        Assert.Contains("AddNpgSql", fencedDiv.RawContent);
+        Assert.Contains("AddUrlGroup", fencedDiv.RawContent);
+        Assert.Contains("MapHealthChecks", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -528,14 +526,14 @@ title: Health Check Implementation
 
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().First();
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().First();
-        
-        Assert.Contains("EmailServiceHealthCheck", codeBlock.Content);
-        Assert.Contains("IHealthCheck", codeBlock.Content);
-        Assert.Contains("CheckHealthAsync", codeBlock.Content);
-        Assert.Contains("SmtpClient", codeBlock.Content);
-        Assert.Contains("HealthCheckResult.Healthy", codeBlock.Content);
-        Assert.Contains("HealthCheckResult.Unhealthy", codeBlock.Content);
+        Assert.False(fencedDiv.HasChildren);
+
+        Assert.Contains("EmailServiceHealthCheck", fencedDiv.RawContent);
+        Assert.Contains("IHealthCheck", fencedDiv.RawContent);
+        Assert.Contains("CheckHealthAsync", fencedDiv.RawContent);
+        Assert.Contains("SmtpClient", fencedDiv.RawContent);
+        Assert.Contains("HealthCheckResult.Healthy", fencedDiv.RawContent);
+        Assert.Contains("HealthCheckResult.Unhealthy", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -607,18 +605,20 @@ Define standard interfaces for your configuration classes:
         // First code block
         var firstDiv = fencedDivs[0];
         Assert.Equal("C:Codeblock", firstDiv.Tag);
-        Assert.Contains("EmailOptions", firstDiv.Children.OfType<CodeBlockNode>().First().Content);
-        
+        Assert.False(firstDiv.HasChildren);
+        Assert.Contains("EmailOptions", firstDiv.RawContent);
+
         // Second code block
         var secondDiv = fencedDivs[1];
         Assert.Equal("C:Codeblock", secondDiv.Tag);
-        Assert.Contains("IStandardOptions", secondDiv.Children.OfType<CodeBlockNode>().First().Content);
+        Assert.False(secondDiv.HasChildren);
+        Assert.Contains("IStandardOptions", secondDiv.RawContent);
     }
 
     [Fact]
-    public void Parse_CodeBlockWithIndentedCodeInside_ParsesAsIndentedCodeBlock()
+    public void Parse_CodeBlockWithIndentedCodeInside_StoresInRawContent()
     {
-        // Arrange - When code is indented inside a fenced div, it should be parsed as indented code block
+        // Arrange - C:Codeblock uses colon convention, so inner content is not parsed
         var markdown = """
 ---
 title: Indented Code
@@ -637,20 +637,18 @@ title: Indented Code
 
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().First();
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().First();
-        
-        Assert.NotNull(codeBlock);
-        Assert.Contains("TestClass", codeBlock.Content);
-        Assert.Contains("Method", codeBlock.Content);
-        // Indentation is stripped (4 spaces removed), so "public class" should be at the start
-        Assert.Contains("public class TestClass", codeBlock.Content);
-        Assert.DoesNotContain("    public class", codeBlock.Content);
+        Assert.False(fencedDiv.HasChildren); // Colon convention: no parsing
+
+        Assert.Contains("TestClass", fencedDiv.RawContent);
+        Assert.Contains("Method", fencedDiv.RawContent);
+        // RawContent preserves indentation
+        Assert.Contains("    public class TestClass", fencedDiv.RawContent);
     }
 
     [Fact]
-    public void Parse_CodeBlockWithFencedCodeInside_ParsesAsFencedCodeBlock()
+    public void Parse_CodeBlockWithFencedCodeInside_StoresInRawContent()
     {
-        // Arrange - When fenced code block is inside a fenced div
+        // Arrange - C:Codeblock uses colon convention, so inner content is not parsed
         var markdown = """
 ---
 title: Nested Fenced Code
@@ -671,13 +669,12 @@ public class Nested
 
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().First();
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().First();
-        
-        Assert.NotNull(codeBlock);
-        Assert.True(codeBlock.IsFenced);
-        Assert.Equal("csharp", codeBlock.Info);
-        Assert.Contains("Nested", codeBlock.Content);
-        Assert.Contains("Property", codeBlock.Content);
+        Assert.False(fencedDiv.HasChildren); // Colon convention: no parsing
+
+        // RawContent should contain the fenced code syntax
+        Assert.Contains("```csharp", fencedDiv.RawContent);
+        Assert.Contains("Nested", fencedDiv.RawContent);
+        Assert.Contains("Property", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -713,14 +710,12 @@ Final paragraph.
         
         var fencedDivs = document.Children.OfType<FencedDivNode>().ToList();
         Assert.Equal(2, fencedDivs.Count);
-        
-        var firstCodeBlock = fencedDivs[0].Children.OfType<CodeBlockNode>().FirstOrDefault();
-        Assert.NotNull(firstCodeBlock);
-        Assert.Contains("First", firstCodeBlock.Content);
-        
-        var secondCodeBlock = fencedDivs[1].Children.OfType<CodeBlockNode>().FirstOrDefault();
-        Assert.NotNull(secondCodeBlock);
-        Assert.Contains("Second", secondCodeBlock.Content);
+
+        Assert.False(fencedDivs[0].HasChildren);
+        Assert.Contains("First", fencedDivs[0].RawContent);
+
+        Assert.False(fencedDivs[1].HasChildren);
+        Assert.Contains("Second", fencedDivs[1].RawContent);
     }
 
     [Fact]
@@ -755,14 +750,13 @@ title: Complex Code
 
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().First();
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().First();
-        
-        // Note: Indentation is stripped, so content starts at column 0
-        Assert.Contains("ValidateAsync", codeBlock.Content);
-        Assert.Contains("where TOptions", codeBlock.Content);
-        Assert.Contains("Select", codeBlock.Content);
-        Assert.Contains("ToList", codeBlock.Content);
-        Assert.Contains("ValidateOptionsResult", codeBlock.Content);
+        Assert.False(fencedDiv.HasChildren);
+
+        Assert.Contains("ValidateAsync", fencedDiv.RawContent);
+        Assert.Contains("where TOptions", fencedDiv.RawContent);
+        Assert.Contains("Select", fencedDiv.RawContent);
+        Assert.Contains("ToList", fencedDiv.RawContent);
+        Assert.Contains("ValidateOptionsResult", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -806,19 +800,13 @@ title: Multiple Classes Example
         var fencedDiv = document.Children.OfType<FencedDivNode>().FirstOrDefault();
         Assert.NotNull(fencedDiv);
         Assert.Equal("C:Codeblock", fencedDiv.Tag);
-        
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().FirstOrDefault();
-        Assert.NotNull(codeBlock);
-        
-        // Verify both classes are present in the same code block
-        Assert.Contains("public class EmailOptions", codeBlock.Content);
-        Assert.Contains("public class EmailService", codeBlock.Content);
-        Assert.Contains("SmtpServer", codeBlock.Content);
-        Assert.Contains("SendEmail", codeBlock.Content);
-        
-        // Verify it's a single code block (not multiple)
-        var codeBlocks = fencedDiv.Children.OfType<CodeBlockNode>().ToList();
-        Assert.Single(codeBlocks);
+        Assert.False(fencedDiv.HasChildren);
+
+        // Verify both classes are present in the raw content
+        Assert.Contains("public class EmailOptions", fencedDiv.RawContent);
+        Assert.Contains("public class EmailService", fencedDiv.RawContent);
+        Assert.Contains("SmtpServer", fencedDiv.RawContent);
+        Assert.Contains("SendEmail", fencedDiv.RawContent);
     }
 
     [Fact]
@@ -844,20 +832,12 @@ title: Raw Content Test
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().FirstOrDefault();
         Assert.NotNull(fencedDiv);
-        
+        Assert.False(fencedDiv.HasChildren); // Colon convention: no parsing
+
         // RawContent should preserve the original indentation
         Assert.NotNull(fencedDiv.RawContent);
         Assert.Contains("    public class TestClass", fencedDiv.RawContent);
         Assert.Contains("        public void Method()", fencedDiv.RawContent);
-        
-        // CodeBlock.Content should have indentation stripped
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().FirstOrDefault();
-        Assert.NotNull(codeBlock);
-        Assert.Contains("public class TestClass", codeBlock.Content);
-        Assert.DoesNotContain("    public class", codeBlock.Content);
-        
-        // RawContent should be different from CodeBlock.Content (indentation preserved)
-        Assert.NotEqual(fencedDiv.RawContent, codeBlock.Content);
     }
 
     [Fact]
@@ -885,19 +865,13 @@ public class Nested
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().FirstOrDefault();
         Assert.NotNull(fencedDiv);
-        
+        Assert.False(fencedDiv.HasChildren); // Colon convention: no parsing
+
         // RawContent should contain the fenced code block syntax
         Assert.NotNull(fencedDiv.RawContent);
         Assert.Contains("```csharp", fencedDiv.RawContent);
         Assert.Contains("```", fencedDiv.RawContent);
         Assert.Contains("public class Nested", fencedDiv.RawContent);
-        
-        // CodeBlock.Content should only contain the code without fences
-        var codeBlock = fencedDiv.Children.OfType<CodeBlockNode>().FirstOrDefault();
-        Assert.NotNull(codeBlock);
-        Assert.True(codeBlock.IsFenced);
-        Assert.DoesNotContain("```", codeBlock.Content);
-        Assert.Contains("Nested", codeBlock.Content);
     }
 
     [Fact]
@@ -924,16 +898,13 @@ Some text between code blocks.
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().FirstOrDefault();
         Assert.NotNull(fencedDiv);
-        
+        Assert.False(fencedDiv.HasChildren); // Colon convention: no parsing
+
         // RawContent should contain all the raw markdown content
         Assert.NotNull(fencedDiv.RawContent);
         Assert.Contains("public class First", fencedDiv.RawContent);
         Assert.Contains("Some text between code blocks", fencedDiv.RawContent);
         Assert.Contains("public class Second", fencedDiv.RawContent);
-        
-        // Should have multiple code blocks parsed
-        var codeBlocks = fencedDiv.Children.OfType<CodeBlockNode>().ToList();
-        Assert.True(codeBlocks.Count >= 1);
     }
 
     [Fact]

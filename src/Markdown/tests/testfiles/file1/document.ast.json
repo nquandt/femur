@@ -1,0 +1,509 @@
+{
+  "nodeType": "ExtendedDocument",
+  "location": {
+    "offset": 0,
+    "length": 0,
+    "line": 0,
+    "column": 0
+  },
+  "hasFrontMatter": true,
+  "children": [
+    {
+      "nodeType": "FrontMatterBlock",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 0,
+        "column": 0
+      },
+      "rawContent": "title: \u0022Client-Side Redirect\u0022\nslug: \u0022client-side-redirect\u0022\nlang: en\ndescription: \u0022C# extension method for HttpContext to perform client-side redirects using meta-refresh.\u0022",
+      "parsedData": {
+        "title": "Client-Side Redirect",
+        "slug": "client-side-redirect",
+        "lang": "en",
+        "description": "C# extension method for HttpContext to perform client-side redirects using meta-refresh."
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 98,
+        "line": 2,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "If ever needing to force cookie attachment in a user flow given \u201Cstrict\u201D cookie safesite settings."
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 4,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022 filename=\u0022ClientSideRedirectExtensions.cs\u0022 rawUrl=\u0022~/files/articles/ClientSideRedirectExtensions.cs\u0022}",
+      "rawContent": "",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp",
+          "filename": "ClientSideRedirectExtensions.cs",
+          "rawUrl": "~/files/articles/ClientSideRedirectExtensions.cs"
+        }
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 264,
+        "line": 7,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "This does mess with client side analytics tools that rely on things like url referrer headers since the redirect now happens entirely on the client side. You also would need to be cautious about traffic metrics as this would look like an extra visit in many cases."
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 23,
+        "line": 9,
+        "column": 1
+      },
+      "level": 2,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Notes \u0026 Alternatives"
+        }
+      ]
+    },
+    {
+      "nodeType": "List",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 11,
+        "column": 1
+      },
+      "isOrdered": false,
+      "bulletChar": "-",
+      "isLoose": false,
+      "children": [
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 11,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Prevent caching: call a small helper "
+                },
+                {
+                  "nodeType": "CodeSpan",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "context.PreventCaching()"
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " before writing the redirect HTML so browsers and proxies won\u2019t cache the ephemeral redirect page. Example helper:"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 8,
+        "line": 13,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022}",
+      "rawContent": "public static void PreventCaching(this HttpContext context)\n{\n    var headers = context.Response.Headers;\n    headers[\u0022Cache-Control\u0022] = \u0022no-store, no-cache, must-revalidate, proxy-revalidate\u0022;\n    headers[\u0022Pragma\u0022] = \u0022no-cache\u0022;\n    headers[\u0022Expires\u0022] = \u00220\u0022;\n    headers[\u0022Surrogate-Control\u0022] = \u0022no-store\u0022;\n}",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp"
+        }
+      }
+    },
+    {
+      "nodeType": "List",
+      "location": {
+        "offset": 0,
+        "length": 0,
+        "line": 24,
+        "column": 1
+      },
+      "isOrdered": false,
+      "bulletChar": "-",
+      "isLoose": true,
+      "children": [
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 24,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Accessibility / UX: always include a readable message and a visible link for cases where users might happen to see this page even by accident. Consider "
+                },
+                {
+                  "nodeType": "CodeSpan",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "role=\u0022status\u0022"
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " or simple text so screen readers announce the state."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 26,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 329,
+                "line": 1,
+                "column": 1
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Analytics \u0026 referrers: client-side redirects (meta-refresh or JS) typically look like an extra page view in analytics and may not preserve referrer headers the same way as server-side 3xx redirects. If accurate analytics or referrer delivery is critical, prefer server-side redirects when SameSite/cookie configuration allows it."
+                }
+              ]
+            },
+            {
+              "nodeType": "List",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 3,
+                "column": 1
+              },
+              "isOrdered": false,
+              "bulletChar": "-",
+              "isLoose": false,
+              "children": [
+                {
+                  "nodeType": "ListItem",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 3,
+                    "column": 1
+                  },
+                  "children": [
+                    {
+                      "nodeType": "Paragraph",
+                      "location": {
+                        "offset": 0,
+                        "length": 0,
+                        "line": 0,
+                        "column": 0
+                      },
+                      "children": [
+                        {
+                          "nodeType": "Text",
+                          "location": {
+                            "offset": 0,
+                            "length": 0,
+                            "line": 0,
+                            "column": 0
+                          },
+                          "content": "You might also be able to include a special query parameter in the redirect URL to indicate the source of the redirect for analytics purposes."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 30,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "Cookie / SameSite guidance: this technique is intended as a fallback when cookies are blocked by SameSite=Strict in cross-site flows. If acceptable, you might be better off setting cookies with "
+                },
+                {
+                  "nodeType": "CodeSpan",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "SameSite=None; Secure"
+                },
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": " over relying on client-side redirects, provided you understand the security implications and are serving over HTTPS."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "nodeType": "ListItem",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 32,
+            "column": 1
+          },
+          "children": [
+            {
+              "nodeType": "Paragraph",
+              "location": {
+                "offset": 0,
+                "length": 0,
+                "line": 0,
+                "column": 0
+              },
+              "children": [
+                {
+                  "nodeType": "Text",
+                  "location": {
+                    "offset": 0,
+                    "length": 0,
+                    "line": 0,
+                    "column": 0
+                  },
+                  "content": "CSP/security: There are discussions being had about allowing CSP to control the user of meta-refresh. This functionality might break for websites with strict CSP if that is implemented. Also note that if you are enabling client side redirect tactics you should evaluate all forms of XSRF and XSS protections."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nodeType": "Heading",
+      "location": {
+        "offset": 0,
+        "length": 16,
+        "line": 34,
+        "column": 1
+      },
+      "level": 2,
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Example usage"
+        }
+      ]
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 106,
+        "line": 36,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Call the helper from middleware or from a controller action when you have a cross-site cookie requirement:"
+        }
+      ]
+    },
+    {
+      "nodeType": "FencedDiv",
+      "location": {
+        "offset": 0,
+        "length": 1,
+        "line": 38,
+        "column": 1
+      },
+      "tag": "C:Codeblock",
+      "attributes": "{lang=\u0022csharp\u0022}",
+      "rawContent": "await context.ResponseWithClientSideRedirectAsync(\u0022/dashboard\u0022);",
+      "parsedAttributes": {
+        "id": null,
+        "classes": null,
+        "keyValueAttributes": {
+          "lang": "csharp"
+        }
+      }
+    },
+    {
+      "nodeType": "Paragraph",
+      "location": {
+        "offset": 0,
+        "length": 83,
+        "line": 42,
+        "column": 1
+      },
+      "children": [
+        {
+          "nodeType": "Text",
+          "location": {
+            "offset": 0,
+            "length": 0,
+            "line": 0,
+            "column": 0
+          },
+          "content": "Recommendation: Use sparingly, and prefer server side redirects in all other cases."
+        }
+      ]
+    }
+  ]
+}

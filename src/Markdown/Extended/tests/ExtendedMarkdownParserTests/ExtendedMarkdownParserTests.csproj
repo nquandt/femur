@@ -22,4 +22,10 @@
     <ProjectReference Include="../../Parser/src/Femur.Markdown.Extended.Parser.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="../../../tests/testfiles/**/*" LinkBase="testfiles">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
