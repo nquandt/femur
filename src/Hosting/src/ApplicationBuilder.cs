@@ -634,9 +634,7 @@ public class ApplicationBuilder :
 
             if (logger != null)
             {
-#pragma warning disable CA2254 // Template should be a static expression
-                logger.LogCritical(ex, defaultMessage);
-#pragma warning restore CA2254 // Template should be a static expression
+                logger.LogCritical(ex, "{Message}", defaultMessage);
             }
             else
             {

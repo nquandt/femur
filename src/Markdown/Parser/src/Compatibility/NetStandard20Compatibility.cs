@@ -62,6 +62,18 @@ namespace Femur.Markdown.Parser.Compatibility
             return int.TryParse(s, out result);
 #endif
         }
+
+        /// <summary>
+        /// Tries to parse a ReadOnlySpan of characters representing a number to an integer using the specified style.
+        /// </summary>
+        public static bool TryParse(ReadOnlySpan<char> s, System.Globalization.NumberStyles style, IFormatProvider? provider, out int result)
+        {
+#if NETSTANDARD2_0
+            return int.TryParse(s.ToString(), style, provider, out result);
+#else
+            return int.TryParse(s, style, provider, out result);
+#endif
+        }
     }
 }
 
@@ -111,6 +123,22 @@ namespace System
         }
 
         /// <summary>
+        /// Extension method for ReadOnlySpan&lt;char&gt;.Contains(char) for netstandard2.0
+        /// </summary>
+        public static bool Contains(this ReadOnlySpan<char> span, char value)
+        {
+            for (var i = 0; i < span.Length; i++)
+            {
+                if (span[i] == value)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Extension method for StringBuilder.Append(ReadOnlySpan&lt;char&gt;) for netstandard2.0
         /// </summary>
         public static StringBuilder Append(this StringBuilder sb, ReadOnlySpan<char> value)
@@ -140,6 +168,32 @@ namespace System
             }
 
             return str.Length > 0 && str[0] == value;
+        }
+
+        /// <summary>
+        /// Extension method for string.EndsWith(char) for netstandard2.0
+        /// </summary>
+        public static bool EndsWith(this string str, char value)
+        {
+            if (str == null)
+            {
+                throw new ArgumentNullException(nameof(str));
+            }
+
+            return str.Length > 0 && str[str.Length - 1] == value;
+        }
+
+        /// <summary>
+        /// Extension method for string.Contains(char) for netstandard2.0
+        /// </summary>
+        public static bool Contains(this string str, char value)
+        {
+            if (str == null)
+            {
+                throw new ArgumentNullException(nameof(str));
+            }
+
+            return str.IndexOf(value) >= 0;
         }
 
         /// <summary>

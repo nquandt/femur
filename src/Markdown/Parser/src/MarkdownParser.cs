@@ -932,7 +932,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         // Tags with colons (e.g., "C:Codeblock") are treated as literal content containers
         // and skip inner markdown parsing
         var contentStr = string.Join("\n", divContent);
-        var shouldParseContent = string.IsNullOrEmpty(name) || !name.Contains(':');
+        var shouldParseContent = string.IsNullOrEmpty(name) || (name != null && !name.Contains(':'));
 
         fencedDiv = new FencedDivNode
         {
@@ -2311,20 +2311,14 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     }
 
                     // Check if it's an email autolink
-#pragma warning disable CA1847, CA1866
-                    if (content.Contains("@") && !content.StartsWith("@") && !content.EndsWith("@"))
-#pragma warning restore CA1847, CA1866
+                    if (content.Contains('@') && !content.StartsWith('@') && !content.EndsWith('@'))
                     {
                         var atIdx = content.IndexOf('@');
-#pragma warning disable CA1846
-                        var beforeAt = content.Substring(0, atIdx);
-                        var afterAt = content.Substring(atIdx + 1);
-#pragma warning restore CA1846
+                        var beforeAt = content.AsSpan(0, atIdx);
+                        var afterAt = content.AsSpan(atIdx + 1);
 
                         // Simple email validation: non-empty before and after @, with domain having a dot
-#pragma warning disable CA1847
-                        if (beforeAt.Length > 0 && afterAt.Length > 0 && afterAt.Contains("."))
-#pragma warning restore CA1847
+                        if (beforeAt.Length > 0 && afterAt.Length > 0 && afterAt.Contains('.'))
                         {
                             // Flush current text
                             if (currentText.Length > 0)
@@ -2398,9 +2392,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     // Decimal entity: &#123;
                     if (entityContent.StartsWith('#') && entityContent.Length > 1 && char.IsDigit(entityContent[1]))
                     {
-#pragma warning disable CA1846
-                        if (int.TryParse(entityContent.Substring(1), out var codePoint) && codePoint >= 0 && codePoint <= 0x10FFFF)
-#pragma warning restore CA1846
+                        if (Int32Compat.TryParse(entityContent.AsSpan(1), out var codePoint) && codePoint >= 0 && codePoint <= 0x10FFFF)
                         {
                             // Flush current text
                             if (currentText.Length > 0)
@@ -2426,9 +2418,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     // Hex entity: &#x1F600;
                     if (entityContent.StartsWith("#x", StringComparison.OrdinalIgnoreCase) && entityContent.Length > 2)
                     {
-#pragma warning disable CA1846
-                        if (int.TryParse(entityContent.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out var hexCodePoint) && hexCodePoint >= 0 && hexCodePoint <= 0x10FFFF)
-#pragma warning restore CA1846
+                        if (Int32Compat.TryParse(entityContent.AsSpan(2), System.Globalization.NumberStyles.HexNumber, null, out var hexCodePoint) && hexCodePoint >= 0 && hexCodePoint <= 0x10FFFF)
                         {
                             // Flush current text
                             if (currentText.Length > 0)
@@ -2808,9 +2798,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     contentBuilder.Append(marker);
                 }
 
-#pragma warning disable CA1846
-                contentBuilder.Append(text.Substring(contentStart, contentEnd - contentStart));
-#pragma warning restore CA1846
+                contentBuilder.Append(text.AsSpan(contentStart, contentEnd - contentStart));
                 for (var i = 0; i < unconsumedClosingMarkers; i++)
                 {
                     contentBuilder.Append(marker);

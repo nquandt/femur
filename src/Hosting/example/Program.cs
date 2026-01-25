@@ -52,9 +52,7 @@ public class SimpleConsoleService : IConsoleApplication
 
         // Use the greeting service
         var greeting = this._greetingService.GetGreeting(name);
-#pragma warning disable CA2254 // Template should be a static expression
-        this._logger.LogInformation(greeting);
-#pragma warning restore CA2254 // Template should be a static expression
+        this._logger.LogInformation("{Greeting}", greeting);
 
         // Simulate some work
         for (var i = 1; i <= 3; i++)
