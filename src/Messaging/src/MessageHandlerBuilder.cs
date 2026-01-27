@@ -40,4 +40,16 @@ public sealed class MessageHandlerBuilder<TMessage> where TMessage : class, IMes
         this.ConfigureOptions = configure;
         return this;
     }
+
+    /// <summary>
+    /// Specifies a custom serializer for this message type.
+    /// If not specified, uses the default JSON serializer.
+    /// </summary>
+    /// <param name="serializer">The serializer to use.</param>
+    /// <returns>The builder for chaining.</returns>
+    public MessageHandlerBuilder<TMessage> WithSerializer(IMessageSerializer serializer)
+    {
+        this.Serializer = serializer;
+        return this;
+    }
 }

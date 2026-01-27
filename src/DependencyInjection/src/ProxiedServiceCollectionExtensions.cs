@@ -76,6 +76,9 @@ public static class ProxiedServiceCollectionExtensions
         // SourceProviderAccessor - provides access to source provider for proxy types
         services.AddSingleton(new SourceProviderAccessor(sourceProvider, scopeTracker));
 
+        // Root provider marker - captures the root provider to detect scope vs root resolution
+        services.AddSingleton<RootProviderMarker>(sp => new RootProviderMarker(sp));
+
         // ScopedSourceProvider - created per scope to manage scope pairing
         services.AddScoped(sp =>
         {
@@ -88,6 +91,7 @@ public static class ProxiedServiceCollectionExtensions
     {
         return serviceType == typeof(ScopeTracker) ||
                serviceType == typeof(ScopedSourceProvider) ||
+               serviceType == typeof(RootProviderMarker) ||
                serviceType == typeof(SourceProviderAccessor);
     }
 
@@ -150,7 +154,7 @@ public static class ProxiedServiceCollectionExtensions
             return;
         }
 
-        // For unknown open generics, generate a dynamic proxy type
+        // For unknown open generics with interfaces, generate a dynamic proxy type
         if (serviceType.IsInterface)
         {
             var proxyType = OpenGenericProxyGenerator.GetOrCreateProxyType(serviceType);
@@ -187,6 +191,16 @@ public static class ProxiedServiceCollectionExtensions
     {
         return targetProvider =>
         {
+            // Check if we're being called from the root provider
+            var rootMarker = targetProvider.GetService<RootProviderMarker>();
+            if (rootMarker != null && ReferenceEquals(rootMarker.RootProvider, targetProvider))
+            {
+                throw new InvalidOperationException(
+                    $"Cannot resolve scoped service '{serviceType.FullName}' from the root provider. " +
+                    "Scoped services can only be resolved from within a scope. " +
+                    "Use CreateScope() to create a scope before resolving scoped services.");
+            }
+
             var scopedSource = targetProvider.GetService<ScopedSourceProvider>()
                 ?? throw new InvalidOperationException(
                     $"Cannot resolve scoped service '{serviceType.FullName}' outside of a scope. " +

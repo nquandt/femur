@@ -4,25 +4,25 @@ using Xunit;
 
 namespace DependencyInjectionTests;
 
+// Test services - must be top-level for dynamic proxy generation to access them
+public interface ITestService { string GetValue(); }
+public class TestService : ITestService
+{
+    private readonly string _value;
+    public TestService(string value) => _value = value;
+    public string GetValue() => _value;
+}
+
+public interface IGenericService<T> { T GetValue(); }
+public class GenericService<T> : IGenericService<T>
+{
+    private readonly T _value;
+    public GenericService(T value) => _value = value;
+    public T GetValue() => _value;
+}
+
 public class ProxiedServiceCollectionTests
 {
-    // Test services
-    private interface ITestService { string GetValue(); }
-    private class TestService : ITestService
-    {
-        private readonly string _value;
-        public TestService(string value) => _value = value;
-        public string GetValue() => _value;
-    }
-
-    private interface IGenericService<T> { T GetValue(); }
-    private class GenericService<T> : IGenericService<T>
-    {
-        private readonly T _value;
-        public GenericService(T value) => _value = value;
-        public T GetValue() => _value;
-    }
-
     [Fact]
     public void AddProxiedServices_ResolvesFromSourceProvider()
     {
@@ -79,7 +79,10 @@ public class ProxiedServiceCollectionTests
         // Assert - This would throw if open generics weren't handled correctly
         var descriptor = targetServices.FirstOrDefault(d => d.ServiceType == typeof(IGenericService<>));
         Assert.NotNull(descriptor);
-        Assert.Equal(typeof(GenericService<>), descriptor.ImplementationType);
+        
+        // Dynamic proxies are generated for open generic interfaces
+        Assert.NotNull(descriptor.ImplementationType);
+        Assert.StartsWith("DynamicProxy_", descriptor.ImplementationType!.Name);
     }
 
     [Fact]

@@ -182,6 +182,35 @@ public interface IMessageHandler<in TMessage> where TMessage : IMessage
 }
 ```
 
+**Important:** Message handlers are registered as **scoped services**. This means:
+- A new handler instance is created for each message
+- You can inject scoped dependencies like `DbContext`, `IHttpContextAccessor`, etc.
+- Each message gets its own DI scope, perfect for transaction boundaries
+- Scoped services are disposed after message processing completes
+
+**Example with scoped DbContext:**
+```csharp
+public class OrderMessageHandler : IMessageHandler<OrderMessage>
+{
+    private readonly ApplicationDbContext _db;
+    private readonly ILogger<OrderMessageHandler> _logger;
+
+    public OrderMessageHandler(ApplicationDbContext db, ILogger<OrderMessageHandler> logger)
+    {
+        this._db = db;  // Scoped - new instance per message
+        this._logger = logger;
+    }
+
+    public async Task HandleAsync(OrderMessage message, CancellationToken cancellationToken)
+    {
+        // DbContext is scoped to this message - perfect for transactions
+        var order = new Order { Id = message.OrderId, Amount = message.Amount };
+        this._db.Orders.Add(order);
+        await this._db.SaveChangesAsync(cancellationToken);
+    }
+}
+```
+
 ### IMessageSerializer
 Abstraction for message serialization. Implement this to support custom formats.
 
@@ -248,6 +277,48 @@ This allows you to:
 - Scale different message handlers independently
 
 **Note:** If you don't call `UseTransport()`, the handler will use the default (non-keyed) transport.
+
+## Distributed Tracing & Observability
+
+The framework automatically creates **Activities** for distributed tracing using `System.Diagnostics.ActivitySource`. Each message gets:
+
+- **Activity Name:** `ProcessMessage`
+- **Activity Kind:** `Consumer`
+- **Tags:**
+  - `messaging.message_id` - Unique message identifier
+  - `messaging.destination` - Queue/topic name
+  - `messaging.delivery_count` - How many times message was delivered
+  - `messaging.correlation_id` - Correlation ID if present
+
+This integrates seamlessly with:
+- **OpenTelemetry** - Export traces to Jaeger, Zipkin, Application Insights
+- **Application Insights** - Azure monitoring and diagnostics
+- **Custom telemetry** - Any ActivityListener-based solution
+
+**Example with OpenTelemetry:**
+```csharp
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing => tracing
+        .AddSource("Femur.Messaging")  // ← Subscribe to message processing traces
+        .AddAspNetCoreInstrumentation()
+        .AddOtlpExporter());
+```
+
+Activities automatically capture exceptions and set status codes:
+- `Ok` - Message processed successfully
+- `Error` - Processing failed (includes exception details)
+
+**Custom Activity Tags:**
+```csharp
+public async Task HandleAsync(OrderMessage message, CancellationToken cancellationToken)
+{
+    var activity = Activity.Current;
+    activity?.SetTag("order.customer_id", message.CustomerId);
+    activity?.SetTag("order.amount", message.Amount);
+    
+    // Your processing logic
+}
+```
 
 ## Manual Message Consumption
 

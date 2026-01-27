@@ -114,8 +114,8 @@ public class ServiceCollectionExtensionsTests
         services.AddFemurInMemory();
 
         // Act
-        services.AddMessageHandler<OrderMessage, OrderMessageHandler>(
-            configureOptions: options =>
+        services.AddMessageHandler<OrderMessage, OrderMessageHandler>()
+            .Configure(options =>
             {
                 options.MaxDeliveryCount = 5;
                 options.EnableLockTracking = true;
@@ -124,7 +124,8 @@ public class ServiceCollectionExtensionsTests
         var provider = services.BuildServiceProvider();
 
         // Assert - should not throw
-        var handler = provider.GetService<IMessageHandler<OrderMessage>>();
+        var scope = provider.CreateScope();
+        var handler = scope.ServiceProvider.GetService<IMessageHandler<OrderMessage>>();
         Assert.NotNull(handler);
     }
 

@@ -305,4 +305,73 @@ public class MessageHandlerIntegrationTests
         // Assert - should complete without throwing
         Assert.True(true); // If we got here, graceful shutdown worked
     }
+
+    [Fact]
+    public async Task MessageHandler_UsingScopedServices_CreatesNewScopePerMessage()
+    {
+        // Arrange
+        var processedScopes = new List<Guid>();
+
+        var host = Host.CreateDefaultBuilder()
+            .ConfigureServices(services =>
+            {
+                services.AddFemurInMemory();
+                
+                // Register a scoped service that tracks its instance ID
+                services.AddScoped<ScopedTracker>();
+                
+                // Custom handler that uses scoped service
+                services.AddMessageHandler<OrderMessage, ScopedOrderMessageHandler>();
+            })
+            .Build();
+
+        var queue = host.Services.GetMessageQueue();
+
+        // Act - publish 3 messages
+        for (int i = 0; i < 3; i++)
+        {
+            await queue.PublishAsync(new OrderMessage
+            {
+                OrderId = Guid.NewGuid(),
+                CustomerId = $"cust-scope-{i}",
+                Amount = 100m,
+                Items = [new OrderItem { ProductId = "prod-1", Quantity = 1, UnitPrice = 100m }]
+            });
+        }
+
+        await host.StartAsync();
+        await Task.Delay(1000); // Give time to process all messages
+        await host.StopAsync();
+
+        // Assert
+        var completed = queue.GetCompletedMessages(OrderMessage.MessageName);
+        Assert.Equal(3, completed.Count);
+        
+        // Each message should have gotten its own scope instance
+        Assert.Equal(3, ScopedOrderMessageHandler.ProcessedScopes.Count);
+        Assert.Equal(3, ScopedOrderMessageHandler.ProcessedScopes.Distinct().Count());
+    }
+}
+
+// Test helpers for scoped service verification
+public class ScopedTracker
+{
+    public Guid InstanceId { get; } = Guid.NewGuid();
+}
+
+public class ScopedOrderMessageHandler : IMessageHandler<OrderMessage>
+{
+    public static List<Guid> ProcessedScopes { get; } = new();
+    private readonly ScopedTracker _tracker;
+
+    public ScopedOrderMessageHandler(ScopedTracker tracker)
+    {
+        this._tracker = tracker;
+    }
+
+    public Task HandleAsync(OrderMessage message, CancellationToken cancellationToken)
+    {
+        ProcessedScopes.Add(this._tracker.InstanceId);
+        return Task.CompletedTask;
+    }
 }

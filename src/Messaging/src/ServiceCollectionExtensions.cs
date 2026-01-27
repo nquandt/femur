@@ -13,32 +13,26 @@ public static class ServiceCollectionExtensions
     /// <typeparam name="TMessage">The message type to handle.</typeparam>
     /// <typeparam name="THandler">The handler implementation.</typeparam>
     /// <param name="services">The service collection.</param>
-    /// <param name="serializer">The serializer to use. If null, uses default JSON serializer.</param>
-    /// <param name="configureOptions">Optional processor configuration.</param>
     /// <returns>A builder for further configuration.</returns>
+    /// <example>
+    /// <code>
+    /// services.AddMessageHandler&lt;OrderMessage, OrderMessageHandler&gt;()
+    ///     .WithSerializer(customSerializer)
+    ///     .Configure(options => options.MaxDeliveryCount = 5)
+    ///     .UseTransport("primary");
+    /// </code>
+    /// </example>
     public static MessageHandlerBuilder<TMessage> AddMessageHandler<TMessage, THandler>(
-        this IServiceCollection services,
-        IMessageSerializer? serializer = null,
-        Action<MessageProcessorOptions>? configureOptions = null)
+        this IServiceCollection services)
         where TMessage : class, IMessage
         where THandler : class, IMessageHandler<TMessage>
     {
         var builder = new MessageHandlerBuilder<TMessage>(services);
 
-        // Apply configuration if provided
-        if (configureOptions != null)
-        {
-            builder.Configure(configureOptions);
-        }
+        // Register the handler as scoped (one instance per message)
+        services.AddScoped<IMessageHandler<TMessage>, THandler>();
 
-        // Register the handler
-        services.AddSingleton<IMessageHandler<TMessage>, THandler>();
-
-        // Store serializer for later use
-        builder.Serializer = serializer;
-
-        // We'll complete the registration in a separate internal method
-        // so we can access the builder's configuration
+        // Complete registration
         CompleteRegistration(builder);
 
         return builder;
@@ -48,7 +42,6 @@ public static class ServiceCollectionExtensions
         where TMessage : class, IMessage
     {
         var services = builder.Services;
-        var transportKey = builder.TransportKey;
         var optionsName = typeof(TMessage).FullName!;
 
         // Configure options for this message type
@@ -57,26 +50,19 @@ public static class ServiceCollectionExtensions
             services.Configure(optionsName, builder.ConfigureOptions);
         }
 
-        // Register client (created by transport)
-        services.AddSingleton<IMessageClient<TMessage>>(sp =>
-        {
-            var transport = transportKey != null
-                ? sp.GetRequiredKeyedService<IMessagingTransport>(transportKey)
-                : sp.GetRequiredService<IMessagingTransport>();
-            var serializer = builder.Serializer ?? new JsonMessageSerializer();
-            return transport.CreateClient<TMessage>(serializer);
-        });
+        // Register client using shared method
+        services.AddMessageClient<TMessage>(builder.Serializer, builder.TransportKey);
 
         // Register processor
         services.AddSingleton(sp =>
         {
             var client = sp.GetRequiredService<IMessageClient<TMessage>>();
-            var handler = sp.GetRequiredService<IMessageHandler<TMessage>>();
+            var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
             var logger = sp.GetRequiredService<ILogger<MessageProcessor<TMessage>>>();
             var optionsMonitor = sp.GetRequiredService<IOptionsMonitor<MessageProcessorOptions>>();
             var options = Options.Create(optionsMonitor.Get(optionsName));
 
-            return new MessageProcessor<TMessage>(client, handler, logger, options);
+            return new MessageProcessor<TMessage>(client, scopeFactory, logger, options);
         });
 
         // Register hosted service

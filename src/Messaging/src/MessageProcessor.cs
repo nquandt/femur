@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -5,22 +7,24 @@ namespace Femur.Messaging;
 
 /// <summary>
 /// Orchestrates message processing by coordinating the client and handler.
+/// Creates a new DI scope and Activity for each message.
 /// </summary>
 public sealed class MessageProcessor<T> where T : class, IMessage
 {
     private readonly IMessageClient<T> _client;
-    private readonly IMessageHandler<T> _handler;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MessageProcessor<T>> _logger;
     private readonly MessageProcessorOptions _options;
+    private static readonly ActivitySource ActivitySource = new("Femur.Messaging");
 
     public MessageProcessor(
         IMessageClient<T> client,
-        IMessageHandler<T> handler,
+        IServiceScopeFactory scopeFactory,
         ILogger<MessageProcessor<T>> logger,
         IOptions<MessageProcessorOptions>? options = null)
     {
         this._client = client;
-        this._handler = handler;
+        this._scopeFactory = scopeFactory;
         this._logger = logger;
         this._options = options?.Value ?? new MessageProcessorOptions();
     }
@@ -51,7 +55,16 @@ public sealed class MessageProcessor<T> where T : class, IMessage
 
     private async Task ProcessMessageAsync(IReceivedMessage<T> message, CancellationToken cancellationToken)
     {
-        using var scope = this._logger.BeginScope(new Dictionary<string, object>
+        using var activity = ActivitySource.StartActivity("ProcessMessage", ActivityKind.Consumer);
+        activity?.SetTag("messaging.message_id", message.MessageId);
+        activity?.SetTag("messaging.destination", T.MessageName);
+        activity?.SetTag("messaging.delivery_count", message.DeliveryCount);
+        if (message.CorrelationId != null)
+        {
+            activity?.SetTag("messaging.correlation_id", message.CorrelationId);
+        }
+
+        using var logScope = this._logger.BeginScope(new Dictionary<string, object>
         {
             ["MessageId"] = message.MessageId,
             ["DeliveryCount"] = message.DeliveryCount,
@@ -61,6 +74,7 @@ public sealed class MessageProcessor<T> where T : class, IMessage
         // Handle deserialization failures
         if (!message.IsValid)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Deserialization failed");
             this._logger.LogError(message.DeserializationError,
                 "Failed to deserialize message {MessageId}, dead-lettering",
                 message.MessageId);
@@ -76,11 +90,15 @@ public sealed class MessageProcessor<T> where T : class, IMessage
         this._logger.LogDebug("Processing message {MessageId}, delivery {DeliveryCount}",
             message.MessageId, message.DeliveryCount);
 
+        // Create a DI scope for this message (scoped services like DbContext)
+        await using var scope = this._scopeFactory.CreateAsyncScope();
+        var handler = scope.ServiceProvider.GetRequiredService<IMessageHandler<T>>();
+
         var processingToken = this.CreateProcessingToken(message, cancellationToken);
 
         try
         {
-            await this._handler.HandleAsync(message.Body, processingToken).ConfigureAwait(false);
+            await handler.HandleAsync(message.Body, processingToken).ConfigureAwait(false);
 
             // Check if we ran out of time
             if (processingToken.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
@@ -108,10 +126,12 @@ public sealed class MessageProcessor<T> where T : class, IMessage
 
             // Success
             await this._client.CompleteAsync(message, cancellationToken).ConfigureAwait(false);
+            activity?.SetStatus(ActivityStatusCode.Ok);
             this._logger.LogDebug("Message {MessageId} completed successfully", message.MessageId);
         }
         catch (DeadLetterException ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Reason);
             this._logger.LogWarning(ex, "Handler requested dead-letter for message {MessageId}: {Reason}",
                 message.MessageId, ex.Reason);
 
@@ -124,6 +144,12 @@ public sealed class MessageProcessor<T> where T : class, IMessage
         }
         catch (Exception ex) when (this.ShouldDeadLetter(message, ex))
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Max delivery count exceeded");
+            activity?.AddEvent(new ActivityEvent("exception", tags: new ActivityTagsCollection
+            {
+                ["exception.type"] = ex.GetType().FullName,
+                ["exception.message"] = ex.Message
+            }));
             this._logger.LogError(ex,
                 "Max delivery attempts reached or non-retryable exception for message {MessageId}, dead-lettering",
                 message.MessageId);
@@ -132,6 +158,12 @@ public sealed class MessageProcessor<T> where T : class, IMessage
         }
         catch (Exception ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, "Processing failed");
+            activity?.AddEvent(new ActivityEvent("exception", tags: new ActivityTagsCollection
+            {
+                ["exception.type"] = ex.GetType().FullName,
+                ["exception.message"] = ex.Message
+            }));
             this._logger.LogError(ex, "Processing failed for message {MessageId}, abandoning for retry",
                 message.MessageId);
 

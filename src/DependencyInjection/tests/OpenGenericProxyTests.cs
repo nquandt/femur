@@ -5,6 +5,68 @@ using Xunit;
 
 namespace Femur.DependencyInjection.Tests;
 
+// ═══════════════════════════════════════════════════════════════════════
+// Test Types - must be top-level for dynamic proxy generation
+// ═══════════════════════════════════════════════════════════════════════
+
+// Custom open generic for testing
+public interface IRepository<T> where T : class
+{
+    void Add(T entity);
+    T? GetById(int id);
+    IEnumerable<T> GetAll();
+}
+
+public class InMemoryRepository<T> : IRepository<T> where T : class
+{
+    private readonly Dictionary<int, T> _store = new();
+
+    public void Add(T entity)
+    {
+        var id = (int)(entity.GetType().GetProperty("Id")?.GetValue(entity) ?? 0);
+        _store[id] = entity;
+    }
+
+    public T? GetById(int id) => _store.GetValueOrDefault(id);
+
+    public IEnumerable<T> GetAll() => _store.Values;
+}
+
+// Multiple type parameter generic
+public interface IConverter<TIn, TOut>
+{
+    TOut Convert(TIn input);
+}
+
+public class DefaultConverter<TIn, TOut> : IConverter<TIn, TOut>
+{
+    public TOut Convert(TIn input)
+    {
+        return (TOut)System.Convert.ChangeType(input, typeof(TOut))!;
+    }
+}
+
+// Scoped service for testing
+public interface IScopedService
+{
+    Guid InstanceId { get; }
+}
+
+public class ScopedService : IScopedService
+{
+    public Guid InstanceId { get; } = Guid.NewGuid();
+}
+
+// Non-logging service for filtering test
+public interface INonLoggingService { }
+
+// Test entity for repository tests
+public class TestEntity
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+}
+
 /// <summary>
 /// Tests verifying that open generic types are properly proxied,
 /// not just copied to the target collection.
@@ -154,8 +216,11 @@ public class OpenGenericProxyTests
         Assert.NotNull(fromTarget);
         Assert.Equal("Test", fromTarget!.Name);
 
-        // Verify it's the same repository instance
-        Assert.Same(sourceRepo, targetRepo);
+        // Proxies delegate to source, so data is shared
+        // But the instances are not the same (one is proxy, one is concrete)
+        Assert.NotSame(sourceRepo, targetRepo);
+        Assert.IsType<InMemoryRepository<TestEntity>>(sourceRepo);
+        Assert.IsNotType<InMemoryRepository<TestEntity>>(targetRepo); // This is a proxy
     }
 
     [Fact]
@@ -178,7 +243,10 @@ public class OpenGenericProxyTests
 
         // Assert
         Assert.Equal(42, result);
-        Assert.Same(sourceConverter, targetConverter);
+        
+        // Proxies delegate to source, so conversion works
+        // But the instances are not the same (one is proxy, one is concrete)
+        Assert.NotSame(sourceConverter, targetConverter);
     }
 
     [Fact]
@@ -257,7 +325,7 @@ public class OpenGenericProxyTests
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Test Types
+    // Supporting Test Types (nested types not accessed by proxy generator)
     // ═══════════════════════════════════════════════════════════════════════
 
     private class TestClass1 { }
@@ -269,64 +337,7 @@ public class OpenGenericProxyTests
         public string Value { get; set; } = "";
     }
 
-    private class TestEntity
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = "";
-    }
-
-    // Custom open generic for testing
-    public interface IRepository<T> where T : class
-    {
-        void Add(T entity);
-        T? GetById(int id);
-        IEnumerable<T> GetAll();
-    }
-
-    private class InMemoryRepository<T> : IRepository<T> where T : class
-    {
-        private readonly Dictionary<int, T> _store = new();
-
-        public void Add(T entity)
-        {
-            var id = (int)(entity.GetType().GetProperty("Id")?.GetValue(entity) ?? 0);
-            _store[id] = entity;
-        }
-
-        public T? GetById(int id) => _store.GetValueOrDefault(id);
-
-        public IEnumerable<T> GetAll() => _store.Values;
-    }
-
-    // Multiple type parameter generic
-    public interface IConverter<TIn, TOut>
-    {
-        TOut Convert(TIn input);
-    }
-
-    private class DefaultConverter<TIn, TOut> : IConverter<TIn, TOut>
-    {
-        public TOut Convert(TIn input)
-        {
-            return (TOut)System.Convert.ChangeType(input, typeof(TOut))!;
-        }
-    }
-
-    // Scoped service for testing
-    public interface IScopedService
-    {
-        Guid InstanceId { get; }
-    }
-
-    private class ScopedService : IScopedService
-    {
-        public Guid InstanceId { get; } = Guid.NewGuid();
-    }
-
-    // Non-logging service for filtering test
-    public interface INonLoggingService { }
     private class NonLoggingService : INonLoggingService { }
-
     // Test logger provider
     private class CountingLoggerProvider : ILoggerProvider
     {
@@ -340,7 +351,7 @@ public class OpenGenericProxyTests
         {
             private readonly CountingLoggerProvider _provider;
 
-            public CountingLogger(CountingLoggerProvider provider) => _provider = provider;
+            public CountingLogger(CountingLoggerProvider provider) => this._provider = provider;
 
             public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
@@ -349,7 +360,7 @@ public class OpenGenericProxyTests
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
                 Exception? exception, Func<TState, Exception?, string> formatter)
             {
-                _provider.LogCount++;
+                this._provider.LogCount++;
             }
         }
     }
