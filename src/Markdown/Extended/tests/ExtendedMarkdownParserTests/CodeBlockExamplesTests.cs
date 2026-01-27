@@ -45,12 +45,12 @@ Some content here.
         Assert.Equal("IOptions FluentValidation at Startup", document.FrontMatterBlock!.ParsedData!["title"]);
         Assert.Equal("ioptions-fluentvalidation", document.FrontMatterBlock!.ParsedData!["slug"]);
         Assert.Equal("en", document.FrontMatterBlock!.ParsedData!["lang"]);
-        
+
         // Check for heading
         var heading = document.Children.OfType<HeadingNode>().FirstOrDefault();
         Assert.NotNull(heading);
         Assert.Equal(1, heading.Level);
-        
+
         // Check for fenced div code block
         var fencedDiv = document.Children.OfType<FencedDivNode>().FirstOrDefault();
         Assert.NotNull(fencedDiv);
@@ -587,21 +587,21 @@ Define standard interfaces for your configuration classes:
         // Assert
         Assert.NotNull(document.FrontMatterBlock?.ParsedData);
         Assert.Equal("IOptions FluentValidation at Startup", document.FrontMatterBlock!.ParsedData!["title"]);
-        
+
         // Check headings
         var headings = document.Children.OfType<HeadingNode>().ToList();
         Assert.True(headings.Count >= 2);
         Assert.Equal(2, headings[0].Level);
         Assert.Contains("Problem", headings[0].Children.OfType<MarkdownTextNode>().First().Content);
-        
+
         // Check paragraphs
         var paragraphs = document.Children.OfType<ParagraphNode>().ToList();
         Assert.True(paragraphs.Count >= 1);
-        
+
         // Check fenced divs
         var fencedDivs = document.Children.OfType<FencedDivNode>().ToList();
         Assert.True(fencedDivs.Count >= 2);
-        
+
         // First code block
         var firstDiv = fencedDivs[0];
         Assert.Equal("C:Codeblock", firstDiv.Tag);
@@ -707,7 +707,7 @@ Final paragraph.
         // Assert
         var paragraphs = document.Children.OfType<ParagraphNode>().ToList();
         Assert.True(paragraphs.Count >= 3);
-        
+
         var fencedDivs = document.Children.OfType<FencedDivNode>().ToList();
         Assert.Equal(2, fencedDivs.Count);
 
@@ -912,7 +912,7 @@ Some text between code blocks.
     {
         // Arrange
         var expectedContent = "    public class EmailOptions\n    {\n        public string SmtpServer { get; set; }\n        public int Port { get; set; }\n    }";
-        
+
         var markdown = $$"""
 ---
 title: Raw Content Match Test
@@ -929,7 +929,7 @@ title: Raw Content Match Test
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().FirstOrDefault();
         Assert.NotNull(fencedDiv);
-        
+
         // RawContent should match the original content exactly (with newlines normalized)
         Assert.NotNull(fencedDiv.RawContent);
         var normalizedRaw = fencedDiv.RawContent.Replace("\r\n", "\n").TrimEnd();
@@ -956,7 +956,7 @@ title: Empty Content Test
         // Assert
         var fencedDiv = document.Children.OfType<FencedDivNode>().FirstOrDefault();
         Assert.NotNull(fencedDiv);
-        
+
         // RawContent should be empty or whitespace only
         Assert.NotNull(fencedDiv.RawContent);
         Assert.True(string.IsNullOrWhiteSpace(fencedDiv.RawContent));
@@ -986,16 +986,16 @@ title: Multiple Divs Test
         // Assert
         var fencedDivs = document.Children.OfType<FencedDivNode>().ToList();
         Assert.Equal(2, fencedDivs.Count);
-        
+
         // Each div should have its own RawContent
         Assert.NotNull(fencedDivs[0].RawContent);
         Assert.Contains("First", fencedDivs[0].RawContent);
         Assert.DoesNotContain("Second", fencedDivs[0].RawContent);
-        
+
         Assert.NotNull(fencedDivs[1].RawContent);
         Assert.Contains("Second", fencedDivs[1].RawContent);
         Assert.DoesNotContain("First", fencedDivs[1].RawContent);
-        
+
         // RawContent should be different for each div
         Assert.NotEqual(fencedDivs[0].RawContent, fencedDivs[1].RawContent);
     }

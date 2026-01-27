@@ -4,13 +4,16 @@ namespace Femur.DependencyInjection;
 
 /// <summary>
 /// Extension methods for proxying services from one ServiceProvider into another ServiceCollection.
-/// This allows services to be shared across different DI containers while preserving lifetimes and handling edge cases.
+/// This allows services to be shared across different DI containers while preserving lifetimes.
+/// 
+/// All services are proxied consistently - including open generics - ensuring instances are
+/// always resolved from the source provider.
 /// </summary>
 public static class ProxiedServiceCollectionExtensions
 {
     /// <summary>
     /// Adds services from a source ServiceCollection to the target ServiceCollection,
-    /// creating factory delegates that resolve from the provided ServiceProvider.
+    /// creating proxy registrations that resolve from the provided ServiceProvider.
     /// This ensures instances are shared and lifetimes are preserved.
     /// </summary>
     /// <param name="targetServiceCollection">The target service collection to register services into</param>
@@ -26,6 +29,9 @@ public static class ProxiedServiceCollectionExtensions
     {
         options ??= ProxyOptions.Default;
 
+        // Register core infrastructure for proxying (only once)
+        EnsureProxyInfrastructure(targetServiceCollection, sourceServiceProvider);
+
         foreach (var descriptor in sourceDescriptors)
         {
             // Skip services that match the filter
@@ -34,92 +40,185 @@ public static class ProxiedServiceCollectionExtensions
                 continue;
             }
 
-            // Case 1: Open generic types (e.g., IOptions<>) must preserve implementation type
-            // They cannot be registered using factory delegates
-            if (descriptor.ServiceType.IsGenericTypeDefinition ||
-                descriptor.ImplementationType?.IsGenericTypeDefinition == true)
+            // Skip our internal tracking services
+            if (IsInternalProxyService(descriptor.ServiceType))
             {
-                targetServiceCollection.Add(descriptor);
+                continue;
             }
-            // Case 2: Singleton instances should be registered directly
-            // These are already constructed objects that should be reused as-is
-            else if (descriptor.ImplementationInstance != null)
+
+            // Skip IServiceProvider and IServiceScopeFactory - these should come from the target
+            if (descriptor.ServiceType == typeof(IServiceProvider) ||
+                descriptor.ServiceType == typeof(IServiceScopeFactory))
             {
-                targetServiceCollection.Add(descriptor);
+                continue;
             }
-            // Case 3: Existing factories - proxy by default to share instances
-            // For singletons, this ensures the same instance is returned from both providers
-            else if (descriptor.ImplementationFactory != null)
-            {
-                if (options.PreserveExistingFactories)
-                {
-                    // Preserve the original factory as-is (will create new instances)
-                    targetServiceCollection.Add(descriptor);
-                }
-                else
-                {
-                    // Default: resolve from source provider to share instances
-                    // This ensures singletons are shared and lifetimes are preserved
-                    var factory = CreateResolverFactory(descriptor.ServiceType, sourceServiceProvider);
 
-                    var newDescriptor = new ServiceDescriptor(
-                        descriptor.ServiceType,
-                        factory,
-                        descriptor.Lifetime);
-
-                    targetServiceCollection.Add(newDescriptor);
-                }
-            }
-            // Case 4: Regular closed types can use proxy factory
-            else
-            {
-                var factory = CreateResolverFactory(descriptor.ServiceType, sourceServiceProvider);
-
-                var newDescriptor = new ServiceDescriptor(
-                    descriptor.ServiceType,
-                    factory,
-                    descriptor.Lifetime);
-
-                targetServiceCollection.Add(newDescriptor);
-            }
+            RegisterProxiedService(targetServiceCollection, descriptor, sourceServiceProvider, options);
         }
 
         return targetServiceCollection;
     }
 
-    /// <summary>
-    /// Creates a factory function that resolves a service from the source provider.
-    /// The closure captures the source provider and service type.
-    /// </summary>
-    /// <param name="serviceType">The service type to resolve</param>
-    /// <param name="sourceProvider">The source provider to resolve from</param>
-    /// <returns>A factory function that resolves the service</returns>
-    private static Func<IServiceProvider, object> CreateResolverFactory(Type serviceType, IServiceProvider sourceProvider)
+    private static void EnsureProxyInfrastructure(
+        IServiceCollection services,
+        IServiceProvider sourceProvider)
     {
-        return _ => sourceProvider.GetRequiredService(serviceType);
+        // Only register once
+        if (services.Any(sd => sd.ServiceType == typeof(SourceProviderAccessor)))
+        {
+            return;
+        }
+
+        // ScopeTracker - maps target scopes to source scopes
+        var scopeTracker = new ScopeTracker(sourceProvider);
+        services.AddSingleton(scopeTracker);
+
+        // SourceProviderAccessor - provides access to source provider for proxy types
+        services.AddSingleton(new SourceProviderAccessor(sourceProvider, scopeTracker));
+
+        // Root provider marker - captures the root provider to detect scope vs root resolution
+        services.AddSingleton<RootProviderMarker>(sp => new RootProviderMarker(sp));
+
+        // ScopedSourceProvider - created per scope to manage scope pairing
+        services.AddScoped(sp =>
+        {
+            var tracker = sp.GetRequiredService<ScopeTracker>();
+            return tracker.GetOrCreateScopedProvider(sp);
+        });
     }
-}
 
-/// <summary>
-/// Options for controlling service proxying behavior
-/// </summary>
-public class ProxyOptions
-{
-    /// <summary>
-    /// Default proxy options
-    /// </summary>
-    public static ProxyOptions Default { get; } = new ProxyOptions();
+    private static bool IsInternalProxyService(Type serviceType)
+    {
+        return serviceType == typeof(ScopeTracker) ||
+               serviceType == typeof(ScopedSourceProvider) ||
+               serviceType == typeof(RootProviderMarker) ||
+               serviceType == typeof(SourceProviderAccessor);
+    }
 
-    /// <summary>
-    /// Optional predicate to filter out services that should not be proxied.
-    /// Return true to skip the service, false to include it.
-    /// </summary>
-    public Func<ServiceDescriptor, bool>? ShouldSkipService { get; set; }
+    private static void RegisterProxiedService(
+        IServiceCollection targetServices,
+        ServiceDescriptor descriptor,
+        IServiceProvider sourceProvider,
+        ProxyOptions options)
+    {
+        // Case 1: Open generic types - use dynamic proxy type generation
+        if (descriptor.ServiceType.IsGenericTypeDefinition)
+        {
+            RegisterOpenGenericProxy(targetServices, descriptor);
+        }
+        // Case 2: Singleton instances - register directly (already constructed)
+        else if (descriptor.ImplementationInstance != null)
+        {
+            targetServices.Add(descriptor);
+        }
+        // Case 3: Existing factories
+        else if (descriptor.ImplementationFactory != null)
+        {
+            if (options.PreserveExistingFactories)
+            {
+                targetServices.Add(descriptor);
+            }
+            else
+            {
+                var newDescriptor = CreateProxiedDescriptor(
+                    descriptor.ServiceType,
+                    descriptor.Lifetime,
+                    sourceProvider);
+                targetServices.Add(newDescriptor);
+            }
+        }
+        // Case 4: Regular closed types - use proxy factory
+        else
+        {
+            var newDescriptor = CreateProxiedDescriptor(
+                descriptor.ServiceType,
+                descriptor.Lifetime,
+                sourceProvider);
+            targetServices.Add(newDescriptor);
+        }
+    }
 
-    /// <summary>
-    /// Whether to preserve existing factory functions as-is (copying them to the target collection).
-    /// If false (default), factories are proxied to resolve from the source provider, ensuring instances are shared.
-    /// Set to true if you want factories to execute independently in the target provider.
-    /// </summary>
-    public bool PreserveExistingFactories { get; set; }
+    private static void RegisterOpenGenericProxy(
+        IServiceCollection targetServices,
+        ServiceDescriptor descriptor)
+    {
+        var serviceType = descriptor.ServiceType;
+
+        // Check if we have a known proxy type for this open generic
+        if (KnownProxyTypes.TryGetProxyType(serviceType, out var knownProxyType))
+        {
+            targetServices.Add(new ServiceDescriptor(
+                serviceType,
+                knownProxyType,
+                descriptor.Lifetime));
+            return;
+        }
+
+        // For unknown open generics with interfaces, generate a dynamic proxy type
+        if (serviceType.IsInterface)
+        {
+            var proxyType = OpenGenericProxyGenerator.GetOrCreateProxyType(serviceType);
+            targetServices.Add(new ServiceDescriptor(
+                serviceType,
+                proxyType,
+                descriptor.Lifetime));
+        }
+        else
+        {
+            // Can't proxy open generic classes - copy as-is with a warning
+            // This is a limitation: the instances won't be shared
+            targetServices.Add(descriptor);
+        }
+    }
+
+    private static ServiceDescriptor CreateProxiedDescriptor(
+        Type serviceType,
+        ServiceLifetime lifetime,
+        IServiceProvider sourceProvider)
+    {
+        var factory = lifetime switch
+        {
+            ServiceLifetime.Singleton => _ => sourceProvider.GetRequiredService(serviceType),
+            ServiceLifetime.Scoped => CreateScopedResolverFactory(serviceType),
+            ServiceLifetime.Transient => CreateTransientResolverFactory(serviceType, sourceProvider),
+            _ => throw new ArgumentOutOfRangeException(nameof(lifetime))
+        };
+
+        return new ServiceDescriptor(serviceType, factory, lifetime);
+    }
+
+    private static Func<IServiceProvider, object> CreateScopedResolverFactory(Type serviceType)
+    {
+        return targetProvider =>
+        {
+            // Check if we're being called from the root provider
+            var rootMarker = targetProvider.GetService<RootProviderMarker>();
+            if (rootMarker != null && ReferenceEquals(rootMarker.RootProvider, targetProvider))
+            {
+                throw new InvalidOperationException(
+                    $"Cannot resolve scoped service '{serviceType.FullName}' from the root provider. " +
+                    "Scoped services can only be resolved from within a scope. " +
+                    "Use CreateScope() to create a scope before resolving scoped services.");
+            }
+
+            var scopedSource = targetProvider.GetService<ScopedSourceProvider>()
+                ?? throw new InvalidOperationException(
+                    $"Cannot resolve scoped service '{serviceType.FullName}' outside of a scope. " +
+                    "Ensure you are resolving within a valid scope created from the target provider.");
+
+            return scopedSource.ServiceProvider.GetRequiredService(serviceType);
+        };
+    }
+
+    private static Func<IServiceProvider, object> CreateTransientResolverFactory(
+        Type serviceType,
+        IServiceProvider sourceRootProvider)
+    {
+        return targetProvider =>
+        {
+            var scopedSource = targetProvider.GetService<ScopedSourceProvider>();
+            var resolveFrom = scopedSource?.ServiceProvider ?? sourceRootProvider;
+            return resolveFrom.GetRequiredService(serviceType);
+        };
+    }
 }

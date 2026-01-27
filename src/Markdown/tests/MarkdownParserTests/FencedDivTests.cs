@@ -311,7 +311,7 @@ More outer content
         // Assert
         Assert.NotNull(outerDiv);
         Assert.Contains("outer", outerDiv.ParsedAttributes.Classes);
-        
+
         var innerDiv = outerDiv.Children.OfType<FencedDivNode>().FirstOrDefault();
         Assert.NotNull(innerDiv);
         Assert.Contains("inner", innerDiv.ParsedAttributes.Classes);
@@ -527,7 +527,7 @@ End
         // Assert
         var directChildren = article.Children.OfType<FencedDivNode>().ToList();
         Assert.Equal(3, directChildren.Count); // header, body, footer
-        
+
         var body = directChildren.FirstOrDefault(d => d.ParsedAttributes.Classes.Contains("body"));
         Assert.NotNull(body);
         var aside = body.Children.OfType<FencedDivNode>().FirstOrDefault();

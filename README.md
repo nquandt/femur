@@ -25,6 +25,12 @@ Femur is a .NET utilities library designed to simplify application development a
 - **Markdown Renderer** - Convert Markdown AST to HTML
 - **CHTML** - Component-based HTML template language with C# code generation
 
+### Messaging
+- **Message Processing Framework** - Simple, opinionated framework with handler-based message processing
+- **Transport Abstractions** - Clean abstractions supporting multiple message transports
+- **In-Memory Transport** - Fast in-memory implementation for testing and local development
+- **Azure Service Bus** - Production-ready Azure Service Bus transport implementation
+
 ### Infrastructure
 - **Dependency Injection** - Cross-container service proxying and advanced DI patterns
 - **FileSystem Abstractions** - Unified interface for local, in-memory, and Azure Blob storage
@@ -44,6 +50,7 @@ dotnet add package Femur.Hosting
 # Or install specific packages as needed
 dotnet add package Femur.Markdown.Parser
 dotnet add package Femur.Serialization
+dotnet add package Femur.Messaging
 ```
 
 Check out the [Getting Started Guide](docs/getting-started.md) for a complete walkthrough.
@@ -59,6 +66,7 @@ Check out the [Getting Started Guide](docs/getting-started.md) for a complete wa
 
 - **[API Data Aggregator](docs/examples/api-aggregator/README.md)** - Fetch and aggregate data from multiple APIs (demonstrates hosting, validation, logging, serialization)
 - **[Logging Examples](src/Logging/examples/)** - Bootstrap logging patterns with OpenTelemetry integration
+- **[Messaging Examples](src/Messaging/examples/)** - Message processing patterns with multiple transports
 - **[CHTML Templates](src/Chtml/CSharpRenderer/examples/SimpleTemplates/)** - Component-based template examples
 
 ## Package Structure
@@ -68,9 +76,10 @@ Femur is organized into focused packages:
 | Category | Packages |
 |----------|----------|
 | **Core** | Femur, Femur.Parsing, Femur.Markup.Abstractions |
-| **Hosting** | Femur.Hosting, Femur.Hosting.Web, Femur.AspNetCore |
+| **Hosting** | Femur.Hosting, Femur.Hosting.Web, Femur.AspNetCore, Femur.AspNetCore.Endpoints |
 | **Parsers** | Femur.Html.Parser, Femur.Xml.Parser, Femur.Markdown.Parser, Femur.Markdown.Renderer, Femur.Chtml.Parser |
-| **Infrastructure** | Femur.DependencyInjection, Femur.FileSystem, Femur.Serialization |
+| **Messaging** | Femur.Messaging, Femur.Messaging.InMemory, Femur.Messaging.ServiceBus |
+| **Infrastructure** | Femur.DependencyInjection, Femur.FileSystem, Femur.FileSystem.AzureBlob, Femur.Serialization |
 | **Logging** | Femur.Logging.Bootstrap |
 
 See the [full package reference](docs/README.md#module-reference) for complete details.

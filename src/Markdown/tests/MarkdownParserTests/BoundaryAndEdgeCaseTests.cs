@@ -32,7 +32,7 @@ public class BoundaryAndEdgeCaseTests : IClassFixture<TestFixture>, IDisposable
 
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         Assert.Contains("Text before", paragraph.Children.OfType<MarkdownTextNode>().First().Content);
-        
+
         var codeBlock = Assert.IsType<CodeBlockNode>(result.Children[1]);
         Assert.Contains("code", codeBlock.Content);
         Assert.DoesNotContain("Text before", codeBlock.Content);
@@ -48,7 +48,7 @@ public class BoundaryAndEdgeCaseTests : IClassFixture<TestFixture>, IDisposable
         var codeBlock = Assert.IsType<CodeBlockNode>(result.Children[0]);
         Assert.Contains("code", codeBlock.Content);
         Assert.DoesNotContain("After fence", codeBlock.Content);
-        
+
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[1]);
         Assert.Contains("Paragraph", paragraph.Children.OfType<MarkdownTextNode>().First().Content);
     }
@@ -360,7 +360,7 @@ public class BoundaryAndEdgeCaseTests : IClassFixture<TestFixture>, IDisposable
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         var textNode = paragraph.Children.OfType<MarkdownTextNode>().First();
         Assert.Contains("Text", textNode.Content);
-        
+
         var link = paragraph.Children.OfType<LinkNode>().First();
         var linkText = string.Join("", link.Children.OfType<MarkdownTextNode>().Select(n => n.Content));
         Assert.Contains("link", linkText);
@@ -376,7 +376,7 @@ public class BoundaryAndEdgeCaseTests : IClassFixture<TestFixture>, IDisposable
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         var link = paragraph.Children.OfType<LinkNode>().First();
         Assert.Equal("url", link.Url);
-        
+
         var textAfter = paragraph.Children.OfType<MarkdownTextNode>().Last();
         Assert.Contains("after", textAfter.Content);
     }
@@ -432,7 +432,7 @@ public class BoundaryAndEdgeCaseTests : IClassFixture<TestFixture>, IDisposable
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         var textNode = paragraph.Children.OfType<MarkdownTextNode>().First();
         Assert.Contains("Text", textNode.Content);
-        
+
         var emphasis = paragraph.Children.OfType<EmphasisNode>().First();
         Assert.Contains("emphasized", emphasis.Children.OfType<MarkdownTextNode>().First().Content);
     }
@@ -447,7 +447,7 @@ public class BoundaryAndEdgeCaseTests : IClassFixture<TestFixture>, IDisposable
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
         var emphasis = paragraph.Children.OfType<EmphasisNode>().First();
         Assert.Contains("emphasized", emphasis.Children.OfType<MarkdownTextNode>().First().Content);
-        
+
         var textAfter = paragraph.Children.OfType<MarkdownTextNode>().Last();
         Assert.Contains("after", textAfter.Content);
     }
@@ -527,7 +527,7 @@ public class BoundaryAndEdgeCaseTests : IClassFixture<TestFixture>, IDisposable
         // Type 7 HTML block should be first child
         Assert.NotEmpty(result.Children);
         var firstChild = result.Children[0];
-        
+
         // May be HTML block or paragraph depending on implementation
         if (firstChild is HtmlBlockNode htmlBlock)
         {
@@ -616,7 +616,7 @@ public class BoundaryAndEdgeCaseTests : IClassFixture<TestFixture>, IDisposable
 
         var outerQuote = Assert.IsType<BlockQuoteNode>(result.Children[0]);
         Assert.Equal(2, outerQuote.Children.Count);
-        
+
         var innerQuote = Assert.IsType<BlockQuoteNode>(outerQuote.Children[1]);
         Assert.Single(innerQuote.Children);
     }
@@ -630,7 +630,7 @@ public class BoundaryAndEdgeCaseTests : IClassFixture<TestFixture>, IDisposable
 
         var outerList = Assert.IsType<ListNode>(result.Children[0]);
         Assert.Equal(2, outerList.Children.Count);
-        
+
         var firstItem = Assert.IsType<ListItemNode>(outerList.Children[0]);
         var innerList = Assert.IsType<ListNode>(firstItem.Children[1]);
         Assert.Single(innerList.Children);
