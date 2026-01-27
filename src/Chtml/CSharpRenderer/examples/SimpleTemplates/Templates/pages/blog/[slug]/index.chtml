@@ -1,0 +1,37 @@
+---
+Props:
+  Slug: System.String
+---
+
+<!DOCTYPE html>
+<html lang="{globalProps.Language ?? "en"}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{props.Slug} - Blog - {globalProps.SiteName ?? "My Site"}</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 0; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    </style>
+</head>
+<body>
+    <Templates.Generated.Components.Header Title="Blog Post" ShowNavigation="true" />
+    
+    <main class="container">
+        <Templates.Generated.Components.BlogPost 
+            Title="{props.Slug}" 
+            Author="John Doe" 
+            PublishedDate="{System.DateTime.Now}">
+            <p>This is the content for the blog post: {props.Slug}</p>
+            <p>This demonstrates dynamic routing with bracket notation [slug].</p>
+        </Templates.Generated.Components.BlogPost>
+        
+        <div class="mt-8">
+            <Templates.Generated.Components.Button Text="Back to Blog" Href="/blog" Variant="secondary" />
+        </div>
+    </main>
+</body>
+</html>
+
+
+

@@ -1,0 +1,40 @@
+---
+Props:
+  WelcomeMessage: System.String
+---
+
+<!DOCTYPE html>
+<html lang="{globalProps.Language ?? "en"}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{globalProps.SiteName ?? "My Site"}</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 0; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    </style>
+</head>
+<body>
+    <Templates.Generated.Components.Header Title="{globalProps.SiteName ?? "Home"}" ShowNavigation="true" />
+    
+    <main class="container">
+        <h1>{props.WelcomeMessage}</h1>
+        <p>Welcome to our website! This is a sample page demonstrating CHTML templates.</p>
+        
+        <div class="mt-8">
+            <Templates.Generated.Components.Card Title="Features">
+                <p>This template system supports:</p>
+                <ul>
+                    <li>Components with props</li>
+                    <li>Pages with routes</li>
+                    <li>Global properties</li>
+                    <li>Computed properties</li>
+                </ul>
+            </Templates.Generated.Components.Card>
+        </div>
+    </main>
+</body>
+</html>
+
+
+

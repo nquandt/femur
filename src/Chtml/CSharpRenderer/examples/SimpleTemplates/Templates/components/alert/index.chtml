@@ -1,0 +1,14 @@
+---
+Props:
+  Message: System.String
+  Type: System.String
+ComputedProps:
+  AlertClass: System.String
+---
+
+<div class="alert {props.AlertClass}">
+    <strong>{props.Type}:</strong> {props.Message}
+</div>
+
+
+

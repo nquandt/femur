@@ -1,0 +1,47 @@
+---
+Props:
+  ContactEmail: System.String
+---
+
+<!DOCTYPE html>
+<html lang="{globalProps.Language ?? "en"}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact - {globalProps.SiteName ?? "My Site"}</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 0; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        form { display: flex; flex-direction: column; gap: 1rem; }
+        input, textarea { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 0.75rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <Templates.Generated.Components.Header Title="Contact Us" ShowNavigation="true" />
+    
+    <main class="container">
+        <h1>Get in Touch</h1>
+        <p>Email us at: <a href="mailto:{props.ContactEmail}">{props.ContactEmail}</a></p>
+        
+        <form>
+            <div>
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" required />
+            </div>
+            <div>
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required />
+            </div>
+            <div>
+                <label for="message">Message:</label>
+                <textarea id="message" name="message" rows="5" required></textarea>
+            </div>
+            <button type="submit">Send Message</button>
+        </form>
+    </main>
+</body>
+</html>
+
+
+

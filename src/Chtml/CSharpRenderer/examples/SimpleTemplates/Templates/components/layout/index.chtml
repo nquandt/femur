@@ -1,0 +1,40 @@
+---
+Props:
+  PageTitle: System.String
+---
+
+<!DOCTYPE html>
+<html lang="{globalProps.Language ?? "en"}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{props.PageTitle} - {globalProps.SiteName ?? "My Site"}</title>
+    <style>
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #f5f5f5;
+        }
+        .main-content {
+            min-height: calc(100vh - 120px);
+            padding: 2rem 0;
+        }
+    </style>
+</head>
+<body>
+    <Templates.Generated.Components.Header Title="{globalProps.SiteName ?? "My Site"}" ShowNavigation="true" />
+    
+    <main class="main-content">
+        {RenderChildren()}
+    </main>
+    
+    <footer class="bg-gray-800 text-white p-4 text-center">
+        <p>&copy; 2024 {globalProps.SiteName ?? "My Site"}. All rights reserved.</p>
+        <p>Theme: {globalProps.Theme ?? "default"}</p>
+    </footer>
+</body>
+</html>
+
+
+

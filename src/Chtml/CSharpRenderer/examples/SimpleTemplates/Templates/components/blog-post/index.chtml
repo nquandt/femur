@@ -1,0 +1,24 @@
+---
+Props:
+  Title: System.String
+  Author: System.String
+  PublishedDate: System.DateTime
+  Content: RenderPipe
+---
+
+<article class="blog-post">
+    <header>
+        <h1 class="text-3xl font-bold">{props.Title}</h1>
+        <div class="meta text-gray-600">
+            <span>By {props.Author}</span>
+            <span> • </span>
+            <time>{props.PublishedDate:yyyy-MM-dd}</time>
+        </div>
+    </header>
+    <div class="content mt-6">
+        {RenderChildren()}
+    </div>
+</article>
+
+
+

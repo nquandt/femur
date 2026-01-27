@@ -1,0 +1,36 @@
+---
+Props:
+  TeamMembers: System.String[]
+---
+
+<!DOCTYPE html>
+<html lang="{globalProps.Language ?? "en"}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - {globalProps.SiteName ?? "My Site"}</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 0; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    </style>
+</head>
+<body>
+    <Templates.Generated.Components.Header Title="About Us" ShowNavigation="true" />
+    
+    <main class="container">
+        <h1>About Us</h1>
+        <p>We are a team of passionate developers building amazing things.</p>
+        
+        <h2 class="mt-8">Our Team</h2>
+        <ul>
+            @foreach (var member in props.TeamMembers)
+            {
+                <li>{member}</li>
+            }
+        </ul>
+    </main>
+</body>
+</html>
+
+
+

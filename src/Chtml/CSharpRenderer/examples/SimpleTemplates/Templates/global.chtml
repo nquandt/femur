@@ -1,0 +1,9 @@
+---
+GlobalProps:
+  Language: System.String | null
+  SiteName: System.String
+  Theme: System.String
+---
+
+
+

@@ -1,0 +1,33 @@
+---
+Props:
+  Category: System.String
+  Id: System.String
+---
+
+<!DOCTYPE html>
+<html lang="{globalProps.Language ?? "en"}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product {props.Id} in {props.Category} - {globalProps.SiteName ?? "My Site"}</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 0; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    </style>
+</head>
+<body>
+    <Templates.Generated.Components.Header Title="Product Details" ShowNavigation="true" />
+    
+    <main class="container">
+        <h1>Product Details</h1>
+        <Templates.Generated.Components.Card Title="Product Information">
+            <p><strong>Category:</strong> {props.Category}</p>
+            <p><strong>Product ID:</strong> {props.Id}</p>
+            <p>This demonstrates nested dynamic routes with multiple parameters.</p>
+        </Templates.Generated.Components.Card>
+    </main>
+</body>
+</html>
+
+
+

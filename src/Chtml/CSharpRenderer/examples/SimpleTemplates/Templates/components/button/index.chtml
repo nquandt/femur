@@ -1,0 +1,24 @@
+---
+Props:
+  Text: System.String
+  Href: System.String | null
+  Variant: System.String
+ComputedProps:
+  ButtonClass: System.String
+---
+
+@if (props.Href != null)
+{
+    <a href="{props.Href}" class="{props.ButtonClass}">
+        {props.Text}
+    </a>
+}
+else
+{
+    <button class="{props.ButtonClass}">
+        {props.Text}
+    </button>
+}
+
+
+
