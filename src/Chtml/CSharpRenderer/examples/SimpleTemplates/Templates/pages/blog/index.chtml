@@ -1,0 +1,37 @@
+---
+Props:
+  Posts: System.Collections.Generic.List<System.String>
+---
+
+<!DOCTYPE html>
+<html lang="{globalProps.Language ?? "en"}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog - {globalProps.SiteName ?? "My Site"}</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 0; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .post-list { display: grid; gap: 2rem; }
+    </style>
+</head>
+<body>
+    <Templates.Generated.Components.Header Title="Blog" ShowNavigation="true" />
+    
+    <main class="container">
+        <h1>Blog Posts</h1>
+        <div class="post-list">
+            @foreach (var postTitle in props.Posts)
+            {
+                <Templates.Generated.Components.Card Title="{postTitle}">
+                    <p>Read more about {postTitle}...</p>
+                    <Templates.Generated.Components.Button Text="Read More" Href="/blog/{postTitle}" Variant="primary" />
+                </Templates.Generated.Components.Card>
+            }
+        </div>
+    </main>
+</body>
+</html>
+
+
+

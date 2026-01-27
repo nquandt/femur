@@ -24,6 +24,7 @@ jobs:
       run: |
         dotnet pack ./src/AspNetCore/Endpoints/src/Femur.AspNetCore.Endpoints.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/AspNetCore/src/Femur.AspNetCore.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
+        dotnet pack ./src/Chtml/Parser/src/Femur.Chtml.Parser.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/DependencyInjection/src/Femur.DependencyInjection.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/FileSystem/AzureBlob/src/Femur.FileSystem.AzureBlob.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/FileSystem/src/Femur.FileSystem.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
@@ -49,6 +50,7 @@ jobs:
       run: |
         dotnet nuget push ./artifacts/Femur.AspNetCore.Endpoints.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.AspNetCore.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+        dotnet nuget push ./artifacts/Femur.Chtml.Parser.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.DependencyInjection.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.FileSystem.AzureBlob.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.FileSystem.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}

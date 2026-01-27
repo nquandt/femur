@@ -1,0 +1,22 @@
+---
+Props:
+  Title: System.String
+  ShowNavigation: System.Boolean
+---
+
+<header class="bg-white shadow-sm">
+    <div class="container mx-auto px-4 py-4">
+        <h1 class="text-2xl font-bold">{props.Title}</h1>
+        @if (props.ShowNavigation)
+        {
+            <nav class="mt-4">
+                <a href="/" class="mr-4">Home</a>
+                <a href="/about" class="mr-4">About</a>
+                <a href="/blog" class="mr-4">Blog</a>
+            </nav>
+        }
+    </div>
+</header>
+
+
+

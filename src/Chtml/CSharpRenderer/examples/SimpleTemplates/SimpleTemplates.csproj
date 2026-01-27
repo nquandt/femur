@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../../Runtime/src/Femur.Chtml.Runtime.csproj" />
+    <ProjectReference Include="../../src/Femur.Chtml.CSharpRenderer.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <Target Name="GenerateTemplates" BeforeTargets="BeforeBuild">
+    <Exec Command="dotnet run --project $(MSBuildThisFileDirectory)../../src/Femur.Chtml.CSharpRenderer.csproj" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+</Project>
