@@ -528,14 +528,14 @@ This is a comment with *bold* and [link](url) and `code`
         var result = MarkdownParserInstance.Parse(markdown);
 
         var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
-        
+
         // Verify all markdown-like syntax is preserved as-is
         Assert.Contains("*bold*", htmlBlock.Content);
         Assert.Contains("[link](url)", htmlBlock.Content);
         Assert.Contains("`code`", htmlBlock.Content);
         Assert.Contains("# Heading", htmlBlock.Content);
         Assert.Contains("- List item", htmlBlock.Content);
-        
+
         // Verify no markdown nodes were created from comment content
         Assert.Single(result.Children); // Only the HTML block, no paragraphs or other nodes
     }
@@ -595,7 +595,7 @@ Line 3
         var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
         Assert.Equal("<!-- Comment -->", htmlBlock.Content.Trim());
         Assert.DoesNotContain("After comment", htmlBlock.Content);
-        
+
         // Content after comment on same line may be ignored or parsed separately
         // The important thing is it's not included in the HTML block
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[1]);
@@ -613,7 +613,7 @@ Line 3
         Assert.Contains("<?php", htmlBlock.Content);
         Assert.Contains("?>", htmlBlock.Content);
         Assert.DoesNotContain("After content", htmlBlock.Content);
-        
+
         // Content after ?> on same line may be ignored or parsed separately
         // The important thing is it's not included in the HTML block
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[1]);
@@ -643,7 +643,7 @@ Line 3
         Assert.Contains("<![CDATA[", htmlBlock.Content);
         Assert.Contains("]]>", htmlBlock.Content);
         Assert.DoesNotContain("After CDATA", htmlBlock.Content);
-        
+
         // Content after ]]> on same line may be ignored or parsed separately
         // The important thing is it's not included in the HTML block
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[1]);
@@ -661,7 +661,7 @@ Line 3
         Assert.Contains("<script>", htmlBlock.Content);
         Assert.Contains("</script>", htmlBlock.Content);
         Assert.DoesNotContain("After script", htmlBlock.Content);
-        
+
         // Content after </script> on same line may be ignored or parsed separately
         // The important thing is it's not included in the HTML block
         var paragraph = Assert.IsType<ParagraphNode>(result.Children[1]);

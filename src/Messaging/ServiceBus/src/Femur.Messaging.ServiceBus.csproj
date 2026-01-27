@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <PackageId>Femur.Messaging.ServiceBus</PackageId>
+    <Authors>Nicholas Quandt</Authors>
+    <Company>Quandt</Company>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <OutputType>Library</OutputType>
+    <Description>Azure Service Bus transport for Femur.Messaging</Description>
+    <PackageTags>messaging;servicebus;azure;femur</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.13.1" />
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.18.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Femur.Messaging.csproj" />
+  </ItemGroup>
+
+</Project>

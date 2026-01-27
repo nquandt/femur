@@ -75,6 +75,38 @@
     <Project Path="src/DependencyInjection/tests/DependencyInjectionTests.csproj" />
   </Folder>
 
+  <Folder Name="/src/Messaging/src/">
+    <Project Path="src/Messaging/src/Femur.Messaging.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Messaging/tests/">
+    <Project Path="src/Messaging/tests/Femur.Messaging.Tests.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Messaging/InMemory/src/">
+    <Project Path="src/Messaging/InMemory/src/Femur.Messaging.InMemory.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Messaging/ServiceBus/src/">
+    <Project Path="src/Messaging/ServiceBus/src/Femur.Messaging.ServiceBus.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Messaging/examples/Example.App/">
+    <Project Path="src/Messaging/examples/Example.App/Femur.Messaging.Example.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Messaging/examples/Example.MultiTransport/">
+    <Project Path="src/Messaging/examples/Example.MultiTransport/Femur.Messaging.Example.MultiTransport.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Messaging/examples/Example.DIPatterns/">
+    <Project Path="src/Messaging/examples/Example.DIPatterns/Femur.Messaging.Example.DIPatterns.csproj" />
+  </Folder>
+
+  <Folder Name="/src/Messaging/examples/Example.ManualConsumption/">
+    <Project Path="src/Messaging/examples/Example.ManualConsumption/Femur.Messaging.Example.ManualConsumption.csproj" />
+  </Folder>
+
   <Folder Name="/src/Logging/Bootstrap/src/">
     <Project Path="src/Logging/Bootstrap/src/Femur.Logging.Bootstrap.csproj" />
   </Folder>

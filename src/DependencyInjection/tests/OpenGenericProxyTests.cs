@@ -235,16 +235,16 @@ public class OpenGenericProxyTests
         var sourceProvider = sourceServices.BuildServiceProvider();
 
         var targetServices = new ServiceCollection();
-        
+
         // Filter to only logging services using options
         targetServices.AddProxiedServices(sourceServices, sourceProvider, new ProxyOptions
         {
-            ShouldSkipService = sd => 
+            ShouldSkipService = sd =>
                 sd.ServiceType.Namespace?.StartsWith("Microsoft.Extensions.Logging") != true &&
                 sd.ServiceType != typeof(ILoggerFactory) &&
                 !(sd.ServiceType.IsGenericType && sd.ServiceType.GetGenericTypeDefinition() == typeof(ILogger<>))
         });
-        
+
         var targetProvider = targetServices.BuildServiceProvider();
 
         // Act

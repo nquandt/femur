@@ -37,6 +37,9 @@ jobs:
         dotnet pack ./src/Markdown/Extended/Abstractions/src/Femur.Markdown.Extended.Abstractions.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Markdown/Extended/Parser/src/Femur.Markdown.Extended.Parser.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Markup.Abstractions/src/Femur.Markup.Abstractions.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
+        dotnet pack ./src/Messaging/src/Femur.Messaging.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
+        dotnet pack ./src/Messaging/InMemory/src/Femur.Messaging.InMemory.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
+        dotnet pack ./src/Messaging/ServiceBus/src/Femur.Messaging.ServiceBus.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Parsing/src/Femur.Parsing.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/Serialization/src/Femur.Serialization.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
         dotnet pack ./src/src/Femur.csproj --configuration Release /p:Version=${VERSION} --no-build --output ./artifacts/
@@ -59,6 +62,9 @@ jobs:
         dotnet nuget push ./artifacts/Femur.Markdown.Extended.Abstractions.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Markdown.Extended.Parser.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Markup.Abstractions.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+        dotnet nuget push ./artifacts/Femur.Messaging.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+        dotnet nuget push ./artifacts/Femur.Messaging.InMemory.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
+        dotnet nuget push ./artifacts/Femur.Messaging.ServiceBus.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Parsing.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.Serialization.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
         dotnet nuget push ./artifacts/Femur.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${NUGET_TOKEN}
