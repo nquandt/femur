@@ -107,6 +107,10 @@
     <Project Path="src/Messaging/examples/Example.ManualConsumption/Femur.Messaging.Example.ManualConsumption.csproj" />
   </Folder>
 
+  <Folder Name="/src/Messaging/examples/Example.OrderShippedProcessor/">
+    <Project Path="src/Messaging/examples/Example.OrderShippedProcessor/Femur.Messaging.Example.OrderShippedProcessor.csproj" />
+  </Folder>
+
   <Folder Name="/src/Logging/Bootstrap/src/">
     <Project Path="src/Logging/Bootstrap/src/Femur.Logging.Bootstrap.csproj" />
   </Folder>
