@@ -333,10 +333,9 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
     /// </summary>
     protected override void ProcessCharacter(char ch, MarkdownDocumentNode document)
     {
-        // Note: ch is already decoded/cast from bytes by StreamParser
-        // For UTF-8 support, we'd need to decode bytes here, but that would break Position tracking
-        // For now, accept that multi-byte UTF-8 characters may be corrupted in the base StreamParser
-        // but the test uses UTF-8.GetBytes which should work for ASCII-compatible characters
+        // Note: ch is a fully decoded Unicode char. StreamParser uses a StreamReader backed by
+        // UTF-8 encoding which decodes multi-byte sequences before writing into the char[] Buffer.
+        // All Unicode characters (including box-drawing, emoji, CJK, etc.) survive intact.
 
         if (ch == '\n' || ch == '\r')
         {
@@ -352,13 +351,16 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                 this._lines!.Add(string.Empty);
             }
 
-            // Handle \r\n - advance past the line ending character(s)
-            if (ch == '\r' && this.Position < this.Length && this.Buffer[this.Position] == '\n')
+            // Handle \r\n - advance past both characters so the \n is not
+            // processed again as a second (spurious) empty line on Windows.
+            // this.Position still points at the current char (\r or \n) here,
+            // so we check Position+1 for the paired \n after a \r.
+            if (ch == '\r' && this.Position + 1 < this.Length && this.Buffer[this.Position + 1] == '\n')
             {
-                this.Position++; // Skip \n (already advanced past \r)
+                this.Position++; // skip the \n that follows \r
             }
 
-            this.Position++; // Advance past \n or \r
+            this.Position++; // advance past \r (or the lone \n)
         }
         else
         {

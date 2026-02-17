@@ -710,11 +710,11 @@ public class HtmlParser : StreamParser<DocumentNode>
         // Skip past "[CDATA["
         this.Position += cdataStart.Length;
 
-        // Read content until we find ']'
-        var content = this.ReadUntil(']');
+        // Read CDATA content character by character until we find the closing "]]>"
+        // We track consecutive ']' characters; when we see "]]>" we stop.
+        _ = this.StringBuilder.Clear();
+        var bracketCount = 0;
 
-        // Handle closing "]]>" - need to match two ']' followed by '>'
-        var closing = 0;
         while (this.Position < this.Length || this.ReadMore())
         {
             if (this.Position >= this.Length)
@@ -723,26 +723,39 @@ public class HtmlParser : StreamParser<DocumentNode>
             }
 
             var c = this.Buffer[this.Position];
+
             if (c == ']')
             {
-                closing++;
+                bracketCount++;
                 this.Position++;
             }
-            else if (c == '>' && closing >= 2)
+            else if (c == '>' && bracketCount >= 2)
             {
-                // Found closing ]]>
+                // Found closing ]]> — consume '>' and stop
                 this.Position++;
+                // Any brackets beyond the two closing ones are content
+                if (bracketCount > 2)
+                {
+                    _ = this.StringBuilder.Append(new string(']', bracketCount - 2));
+                }
+
                 break;
             }
             else
             {
-                // Not closing - add accumulated ']' and current char to content
-                content += new string(']', closing);
-                closing = 0;
-                content += c;
+                // Not a closing sequence — flush accumulated brackets as content
+                if (bracketCount > 0)
+                {
+                    _ = this.StringBuilder.Append(new string(']', bracketCount));
+                    bracketCount = 0;
+                }
+
+                _ = this.StringBuilder.Append(c);
                 this.Position++;
             }
         }
+
+        var content = this.StringBuilder.ToString();
 
         var endPos = this.GetAbsolutePosition();
         return new CDataNode
