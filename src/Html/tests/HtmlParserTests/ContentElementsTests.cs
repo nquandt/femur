@@ -92,6 +92,35 @@ public class ContentElementsTests : IClassFixture<TestFixture>, IDisposable
     }
 
     [Fact]
+    public void Parse_CodeWithHtmlEntities_PreservesEntitiesAsRawText()
+    {
+        // HTML-encoded content inside <code> must be preserved as-is (not decoded).
+        // This is the contract the nquandtcom-chtml CodeGenerator relies on:
+        // it reads the TextNode.Content and emits it verbatim into writer.Write().
+        var html = "<code>&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;</code>";
+        var result = HtmlParserInstance.Parse(html);
+
+        var code = Assert.IsType<ElementNode>(result.Children[0]);
+        Assert.Equal("code", code.TagName, ignoreCase: true);
+        var text = Assert.IsType<TextNode>(code.Children[0]);
+        Assert.Contains("&lt;", text.Content);
+        Assert.Contains("&gt;", text.Content);
+        Assert.DoesNotContain("<script>", text.Content);
+    }
+
+    [Fact]
+    public void Parse_CodeWithAmpersandEntity_PreservesAmpersandAsRawText()
+    {
+        var html = "<code>a &amp;&amp; b</code>";
+        var result = HtmlParserInstance.Parse(html);
+
+        var code = Assert.IsType<ElementNode>(result.Children[0]);
+        var text = Assert.IsType<TextNode>(code.Children[0]);
+        Assert.Contains("&amp;", text.Content);
+        Assert.DoesNotContain("&&", text.Content);
+    }
+
+    [Fact]
     public void Parse_PreformattedText_PreservesWhitespace()
     {
         var html = "<pre>Line 1\nLine 2\n  Indented</pre>";

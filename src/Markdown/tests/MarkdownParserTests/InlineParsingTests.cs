@@ -67,6 +67,125 @@ public class InlineParsingTests : IClassFixture<TestFixture>, IDisposable
         Assert.Equal("code", codeSpan.Content);
     }
 
+    [Fact]
+    public void Parse_CodeSpan_WithLessThan_ContentIsRawUnescaped()
+    {
+        // The parser must store raw text; HTML encoding is the renderer's responsibility.
+        var markdown = "`if (x < 5)`";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var codeSpan = Assert.IsType<CodeSpanNode>(paragraph.Children[0]);
+        Assert.Equal("if (x < 5)", codeSpan.Content);
+        Assert.DoesNotContain("&lt;", codeSpan.Content);
+    }
+
+    [Fact]
+    public void Parse_CodeSpan_WithGreaterThan_ContentIsRawUnescaped()
+    {
+        var markdown = "`x > 0`";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var codeSpan = Assert.IsType<CodeSpanNode>(paragraph.Children[0]);
+        Assert.Equal("x > 0", codeSpan.Content);
+        Assert.DoesNotContain("&gt;", codeSpan.Content);
+    }
+
+    [Fact]
+    public void Parse_CodeSpan_WithAmpersand_ContentIsRawUnescaped()
+    {
+        var markdown = "`x && y`";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var codeSpan = Assert.IsType<CodeSpanNode>(paragraph.Children[0]);
+        Assert.Equal("x && y", codeSpan.Content);
+        Assert.DoesNotContain("&amp;", codeSpan.Content);
+    }
+
+    [Fact]
+    public void Parse_CodeSpan_WithScriptTag_ContentIsRawUnescaped()
+    {
+        // This is the scenario that triggered the nquandtcom-chtml bug fix.
+        // The parser must NOT HTML-encode the content — only the renderer does.
+        var markdown = "`<script>`";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var codeSpan = Assert.IsType<CodeSpanNode>(paragraph.Children[0]);
+        Assert.Equal("<script>", codeSpan.Content);
+        Assert.DoesNotContain("&lt;", codeSpan.Content);
+        Assert.DoesNotContain("&gt;", codeSpan.Content);
+    }
+
+    [Fact]
+    public void Parse_CodeSpan_WithStyleTag_ContentIsRawUnescaped()
+    {
+        var markdown = "`<style>body{}</style>`";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var codeSpan = Assert.IsType<CodeSpanNode>(paragraph.Children[0]);
+        Assert.Equal("<style>body{}</style>", codeSpan.Content);
+        Assert.DoesNotContain("&lt;", codeSpan.Content);
+    }
+
+    [Fact]
+    public void Parse_CodeSpan_WithAngleBracketsAndAmpersand_ContentIsRawUnescaped()
+    {
+        var markdown = "`x < 5 && y > 10`";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var codeSpan = Assert.IsType<CodeSpanNode>(paragraph.Children[0]);
+        Assert.Equal("x < 5 && y > 10", codeSpan.Content);
+        Assert.DoesNotContain("&lt;", codeSpan.Content);
+        Assert.DoesNotContain("&amp;", codeSpan.Content);
+    }
+
+    [Fact]
+    public void Parse_CodeSpan_WithPairedHtmlTag_ContentIsRawUnescaped()
+    {
+        // A paired open+close HTML tag with inner text: the parser must store it verbatim.
+        var markdown = "`<b>bold</b>`";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var codeSpan = Assert.IsType<CodeSpanNode>(paragraph.Children[0]);
+        Assert.Equal("<b>bold</b>", codeSpan.Content);
+        Assert.DoesNotContain("&lt;", codeSpan.Content);
+        Assert.DoesNotContain("&gt;", codeSpan.Content);
+    }
+
+    [Fact]
+    public void Parse_CodeSpan_WithAttributedHtmlTag_ContentIsRawUnescaped()
+    {
+        // A tag with an attribute whose value contains a quote and ampersand.
+        var markdown = "`<a href=\"x&y\">link</a>`";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var codeSpan = Assert.IsType<CodeSpanNode>(paragraph.Children[0]);
+        Assert.Equal("<a href=\"x&y\">link</a>", codeSpan.Content);
+        Assert.DoesNotContain("&lt;", codeSpan.Content);
+        Assert.DoesNotContain("&amp;", codeSpan.Content);
+        Assert.DoesNotContain("&quot;", codeSpan.Content);
+    }
+
+    [Fact]
+    public void Parse_CodeSpan_WithNestedHtmlTags_ContentIsRawUnescaped()
+    {
+        // Nested tags — the whole thing is raw text in the AST.
+        var markdown = "`<em><strong>text</strong></em>`";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var paragraph = Assert.IsType<ParagraphNode>(result.Children[0]);
+        var codeSpan = Assert.IsType<CodeSpanNode>(paragraph.Children[0]);
+        Assert.Equal("<em><strong>text</strong></em>", codeSpan.Content);
+        Assert.DoesNotContain("&lt;", codeSpan.Content);
+    }
+
     #endregion
 
     #region Links

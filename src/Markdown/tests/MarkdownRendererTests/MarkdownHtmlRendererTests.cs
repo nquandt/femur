@@ -250,6 +250,35 @@ public class MarkdownHtmlRendererTests
         Assert.Contains("&lt;", result);
     }
 
+    [Fact]
+    public void Render_CodeSpanWithScriptTag_IsHtmlEncoded()
+    {
+        var markdown = "Use `<script>` carefully.";
+        var result = ParseAndRender(markdown);
+        Assert.Contains("<code>&lt;script&gt;</code>", result);
+        Assert.DoesNotContain("<script>", result.Replace("<code>", "").Replace("</code>", ""));
+    }
+
+    [Fact]
+    public void Render_CodeSpanWithStyleTag_IsHtmlEncoded()
+    {
+        var markdown = "Use `<style>` carefully.";
+        var result = ParseAndRender(markdown);
+        Assert.Contains("<code>&lt;style&gt;</code>", result);
+    }
+
+    [Fact]
+    public void Render_CodeSpanWithAllHtmlSpecialChars_EscapesAll()
+    {
+        var markdown = "Code: `< > & \" '`";
+        var result = ParseAndRender(markdown);
+        Assert.Contains("&lt;", result);
+        Assert.Contains("&gt;", result);
+        Assert.Contains("&amp;", result);
+        Assert.Contains("&quot;", result);
+        Assert.Contains("&#39;", result);
+    }
+
     #endregion
 
     #region Link Tests
@@ -773,6 +802,82 @@ var code = ""test"";
         var result = ParseAndRender(markdown);
         Assert.Contains("<code>", result);
         Assert.Contains("&amp;", result);
+    }
+
+    [Fact]
+    public void Render_CodeSpanWithGreaterThan_EscapesGt()
+    {
+        var markdown = "Use `x > 0` as the condition.";
+        var result = ParseAndRender(markdown);
+        Assert.Contains("<code>", result);
+        Assert.Contains("&gt;", result);
+        Assert.DoesNotContain("x > 0", result);
+    }
+
+    [Fact]
+    public void Render_CodeSpanWithApostrophe_EscapesApostrophe()
+    {
+        var markdown = "Call `alert('hi')` carefully.";
+        var result = ParseAndRender(markdown);
+        Assert.Contains("<code>", result);
+        Assert.Contains("&#39;", result);
+    }
+
+    [Fact]
+    public void Render_CodeSpanWithScriptTag_ProducesEscapedOutput()
+    {
+        // End-to-end: the rendered HTML must not contain a raw <script> tag inside <code>.
+        var markdown = "Use `<script>` here.";
+        var result = ParseAndRender(markdown);
+        Assert.Equal("<p>Use <code>&lt;script&gt;</code> here.</p>", result);
+    }
+
+    [Fact]
+    public void Render_CodeSpanWithAllHtmlSpecials_EscapesAll()
+    {
+        var markdown = "`< > & \" '`";
+        var result = ParseAndRender(markdown);
+        Assert.Contains("&lt;", result);
+        Assert.Contains("&gt;", result);
+        Assert.Contains("&amp;", result);
+        Assert.Contains("&quot;", result);
+        Assert.Contains("&#39;", result);
+        Assert.DoesNotContain("< > & \" '", result);
+    }
+
+    [Fact]
+    public void Render_CodeSpanWithPairedHtmlTag_EscapesBothTagsAndContent()
+    {
+        // `<b>bold</b>` must render as <code>&lt;b&gt;bold&lt;/b&gt;</code> —
+        // the browser must never see a live <b> element inside <code>.
+        var markdown = "Use `<b>bold</b>` here.";
+        var result = ParseAndRender(markdown);
+        Assert.Equal("<p>Use <code>&lt;b&gt;bold&lt;/b&gt;</code> here.</p>", result);
+        Assert.DoesNotContain("<b>", result);
+    }
+
+    [Fact]
+    public void Render_CodeSpanWithAttributedHtmlTag_EscapesAttributeChars()
+    {
+        // `<a href="x&y">link</a>` — quotes and ampersand in the attribute must be escaped.
+        var markdown = "`<a href=\"x&y\">link</a>`";
+        var result = ParseAndRender(markdown);
+        Assert.Contains("<code>", result);
+        Assert.Contains("&lt;a href=", result);
+        Assert.Contains("&amp;", result);
+        Assert.Contains("&quot;", result);
+        Assert.DoesNotContain("<a href=", result.Replace("<code>", "").Replace("</code>", ""));
+    }
+
+    [Fact]
+    public void Render_CodeSpanWithNestedHtmlTags_EscapesAll()
+    {
+        // `<em><strong>text</strong></em>` — every angle bracket must be escaped.
+        var markdown = "`<em><strong>text</strong></em>`";
+        var result = ParseAndRender(markdown);
+        Assert.Contains("<code>&lt;em&gt;&lt;strong&gt;text&lt;/strong&gt;&lt;/em&gt;</code>", result);
+        Assert.DoesNotContain("<em>", result.Replace("<code>", "").Replace("</code>", ""));
+        Assert.DoesNotContain("<strong>", result.Replace("<code>", "").Replace("</code>", ""));
     }
 
     #endregion
