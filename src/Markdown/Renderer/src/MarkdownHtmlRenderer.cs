@@ -49,33 +49,71 @@ public class MarkdownHtmlRenderer : MarkdownAstWalker
     }
 
     /// <summary>
-    /// Escapes HTML special characters in text content.
-    /// Must replace &amp; first to avoid double-escaping.
-    /// Also escapes curly quotes that may have been introduced by smart punctuation.
+    /// Appends HTML-escaped text content directly into a StringBuilder.
+    /// Single-pass scan: no intermediate string allocations.
+    /// Escapes &amp;, &lt;, &gt;, &quot; (including smart-quote variants), and &#39; (including smart-quote variants).
     /// </summary>
-    private static string EscapeHtml(string text)
+    private static void AppendEscapedHtml(StringBuilder sb, string text)
     {
         if (string.IsNullOrEmpty(text))
         {
-            return string.Empty;
+            return;
         }
 
-        return text
-            .Replace("&", "&amp;")
-            .Replace("<", "&lt;")
-            .Replace(">", "&gt;")
-            .Replace("\"", "&quot;")
-            .Replace("\u201C", "&quot;")  // Left double quotation mark
-            .Replace("\u201D", "&quot;")  // Right double quotation mark
-            .Replace("'", "&#39;")
-            .Replace("\u2018", "&#39;")    // Left single quotation mark
-            .Replace("\u2019", "&#39;");   // Right single quotation mark
+        var start = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            var ch = text[i];
+            string? replacement;
+            switch (ch)
+            {
+                case '&':
+                    replacement = "&amp;";
+                    break;
+                case '<':
+                    replacement = "&lt;";
+                    break;
+                case '>':
+                    replacement = "&gt;";
+                    break;
+                case '"':
+                case '\u201C': // Left double quotation mark (from smart punctuation)
+                case '\u201D': // Right double quotation mark
+                    replacement = "&quot;";
+                    break;
+                case '\'':
+                case '\u2018': // Left single quotation mark
+                case '\u2019': // Right single quotation mark
+                    replacement = "&#39;";
+                    break;
+                default:
+                    replacement = null;
+                    break;
+            }
+
+            if (replacement != null)
+            {
+                if (i > start)
+                {
+                    sb.Append(text, start, i - start);
+                }
+
+                sb.Append(replacement);
+                start = i + 1;
+            }
+        }
+
+        if (start < text.Length)
+        {
+            sb.Append(text, start, text.Length - start);
+        }
     }
 
     /// <summary>
-    /// Escapes HTML attributes (URLs, titles, etc.).
-    /// Must replace &amp; first to avoid double-escaping.
-    /// Also escapes curly quotes that may have been introduced by smart punctuation.
+    /// Returns an HTML-escaped string for use in attribute values.
+    /// Escapes &amp;, &lt;, &gt;, and &quot; (including smart-quote variants).
+    /// Kept as a string-returning overload for callers that need a string value (e.g. building
+    /// attribute strings in a local StringBuilder).
     /// </summary>
     private static string EscapeHtmlAttribute(string text)
     {
@@ -84,13 +122,68 @@ public class MarkdownHtmlRenderer : MarkdownAstWalker
             return string.Empty;
         }
 
-        return text
-            .Replace("&", "&amp;")
-            .Replace("<", "&lt;")
-            .Replace(">", "&gt;")
-            .Replace("\"", "&quot;")
-            .Replace("\u201C", "&quot;")  // Left double quotation mark
-            .Replace("\u201D", "&quot;");  // Right double quotation mark
+        // Use a local StringBuilder for attribute values (these are short and infrequent).
+        var sb = new StringBuilder(text.Length + 8);
+        var start = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            var ch = text[i];
+            string? replacement;
+            switch (ch)
+            {
+                case '&':
+                    replacement = "&amp;";
+                    break;
+                case '<':
+                    replacement = "&lt;";
+                    break;
+                case '>':
+                    replacement = "&gt;";
+                    break;
+                case '"':
+                case '\u201C':
+                case '\u201D':
+                    replacement = "&quot;";
+                    break;
+                default:
+                    replacement = null;
+                    break;
+            }
+
+            if (replacement != null)
+            {
+                if (i > start)
+                {
+                    sb.Append(text, start, i - start);
+                }
+
+                sb.Append(replacement);
+                start = i + 1;
+            }
+        }
+
+        if (start < text.Length)
+        {
+            sb.Append(text, start, text.Length - start);
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Escapes HTML special characters and returns a string.
+    /// Used in the few places that still need a string result (e.g. code block content += '\n').
+    /// </summary>
+    private static string EscapeHtml(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        var sb = new StringBuilder(text.Length + 8);
+        AppendEscapedHtml(sb, text);
+        return sb.ToString();
     }
 
     /// <summary>
@@ -136,13 +229,12 @@ public class MarkdownHtmlRenderer : MarkdownAstWalker
 
         // Preserve trailing newline for fenced code blocks (CommonMark spec)
         var originalContent = node.Content;
-        var content = EscapeHtml(originalContent);
+        AppendEscapedHtml(this._output, originalContent);
         if (node.IsFenced && !string.IsNullOrEmpty(originalContent) && !originalContent.EndsWith('\n'))
         {
-            content += '\n';
+            _ = this._output.Append('\n');
         }
 
-        _ = this._output.Append(content);
         _ = this._output.Append("</code></pre>");
     }
 
@@ -234,8 +326,18 @@ public class MarkdownHtmlRenderer : MarkdownAstWalker
         // Add classes if present
         if (node.ParsedAttributes.Classes.Count > 0)
         {
-            var classList = string.Join(" ", node.ParsedAttributes.Classes.Select(c => EscapeHtmlAttribute(c)));
-            attributes.Append($" class=\"{classList}\"");
+            attributes.Append(" class=\"");
+            for (var ci = 0; ci < node.ParsedAttributes.Classes.Count; ci++)
+            {
+                if (ci > 0)
+                {
+                    attributes.Append(' ');
+                }
+
+                attributes.Append(EscapeHtmlAttribute(node.ParsedAttributes.Classes[ci]));
+            }
+
+            attributes.Append('"');
             hasAnyAttributes = true;
         }
 
@@ -278,7 +380,7 @@ public class MarkdownHtmlRenderer : MarkdownAstWalker
         {
             // For tags with colon convention (e.g., C:Codeblock) that skip parsing,
             // render the raw content as escaped text
-            _ = this._output.Append(EscapeHtml(node.RawContent));
+            AppendEscapedHtml(this._output, node.RawContent);
         }
 
         // Render closing tag
@@ -338,7 +440,7 @@ public class MarkdownHtmlRenderer : MarkdownAstWalker
     protected override void VisitCodeSpan(CodeSpanNode node)
     {
         _ = this._output.Append("<code>");
-        _ = this._output.Append(EscapeHtml(node.Content));
+        AppendEscapedHtml(this._output, node.Content);
         _ = this._output.Append("</code>");
     }
 
@@ -354,7 +456,7 @@ public class MarkdownHtmlRenderer : MarkdownAstWalker
 
     protected override void VisitText(MarkdownTextNode node)
     {
-        _ = this._output.Append(EscapeHtml(node.Content));
+        AppendEscapedHtml(this._output, node.Content);
     }
 
     /// <summary>

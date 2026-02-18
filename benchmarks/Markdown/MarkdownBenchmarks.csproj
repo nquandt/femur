@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+    <PackageReference Include="Markdig" Version="0.45.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Markdown/Parser/src/Femur.Markdown.Parser.csproj" />
+    <ProjectReference Include="../../src/Markdown/Renderer/src/Femur.Markdown.Renderer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="inputs\small.md" />
+    <EmbeddedResource Include="inputs\medium.md" />
+    <EmbeddedResource Include="inputs\large.md" />
+  </ItemGroup>
+
+</Project>

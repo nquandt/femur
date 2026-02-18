@@ -20,6 +20,41 @@ namespace Femur.Markdown.Parser;
 /// </summary>
 public class MarkdownParser : StreamParser<MarkdownDocumentNode>
 {
+    /// <summary>
+    /// Cached compiled regexes used in hot parsing paths.
+    /// Nested inside MarkdownParser to satisfy SA1649 (first type in file must match filename).
+    /// </summary>
+    private static class Regexes
+    {
+        internal static readonly Regex BulletListLine =
+            new Regex(@"^\s*[-*+]\s", RegexOptions.Compiled);
+
+        internal static readonly Regex OrderedListLine =
+            new Regex(@"^\s*\d+[.)]\s", RegexOptions.Compiled);
+
+        internal static readonly Regex WhitespaceCollapse =
+            new Regex(@"\s+", RegexOptions.Compiled);
+
+        internal static readonly Regex HtmlBlock1Start =
+            new Regex(@"^<(script|style|pre|iframe)(?:\s|>|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        // Block-6 tag list compiled once.
+        private const string Block6Tags =
+            "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|" +
+            "details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|" +
+            "h1|h2|h3|h4|h5|h6|head|header|hr|html|legend|li|link|main|menu|menuitem|meta|nav|" +
+            "noframes|ol|optgroup|option|param|section|source|summary|table|tbody|td|tfoot|th|" +
+            "thead|title|tr|track|ul";
+
+        internal static readonly Regex HtmlBlock6Start =
+            new Regex(@"^</?(" + Block6Tags + @")(?:\s|>|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        internal static readonly Regex HtmlBlock7Start =
+            new Regex(@"^</?\w+(?:\s|[^>]*)?/?>?\s*$", RegexOptions.Compiled);
+
+        internal static readonly Regex HtmlBlock7ExcludeStart =
+            new Regex(@"^<(script|pre|style)(?:\s|>|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    }
     private MarkdownDocumentNode? _document;
     private MarkdownContainerNode? _currentParent;
     private Stack<MarkdownContainerNode>? _blockStack;
@@ -71,7 +106,9 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
     private sealed class CommonMarkDelimiterProcessor
     {
         private readonly string _text;
-        private readonly Stack<DelimiterEntry> _delimiterStack = new Stack<DelimiterEntry>();
+        // List<T> used as a stack: push = Add, pop = RemoveAt(Count-1), peek = [Count-1].
+        // Unlike Stack<T>, List<T> supports O(1) random-access indexing so we never need ToArray().
+        private readonly List<DelimiterEntry> _delimiterStack = new List<DelimiterEntry>();
         private readonly List<(DelimiterEntry opener, DelimiterEntry closer, int emphasisLevel)> _processedMatches = new List<(DelimiterEntry, DelimiterEntry, int)>();
 
         public CommonMarkDelimiterProcessor(string text)
@@ -183,12 +220,12 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     continue;
                 }
 
-                // Walk the stack looking for matching opener
+                // Walk the stack looking for matching opener.
+                // _delimiterStack is a List<T> so we can index directly — no ToArray() needed.
                 var openerIndex = -1;
                 for (var i = this._delimiterStack.Count - 1; i >= 0; i--)
                 {
-                    var stackArray = this._delimiterStack.ToArray();
-                    var potential = stackArray[i];
+                    var potential = this._delimiterStack[i];
 
                     if (!potential.CanOpen || potential.Character != closer.Character)
                     {
@@ -226,8 +263,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
 
                 if (openerIndex >= 0)
                 {
-                    var stackArray = this._delimiterStack.ToArray();
-                    var opener = stackArray[openerIndex];
+                    var opener = this._delimiterStack[openerIndex];
 
                     var useCount = Math.Min(opener.Count, closer.Count);
                     if (useCount >= 2)
@@ -243,15 +279,13 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     this._processedMatches.Add((opener, closer, useCount));
 
                     // Remove matched opener and all unopened delimiters after it
-                    while (this._delimiterStack.Count > openerIndex)
-                    {
-                        this._delimiterStack.Pop();
-                    }
+                    // (RemoveRange is O(n) but avoids repeated RemoveAt shifts for large stacks)
+                    this._delimiterStack.RemoveRange(openerIndex, this._delimiterStack.Count - openerIndex);
 
                     // If opener wasn't fully consumed, push back the remainder
                     if (opener.Count > useCount)
                     {
-                        this._delimiterStack.Push(new DelimiterEntry
+                        this._delimiterStack.Add(new DelimiterEntry
                         {
                             Character = opener.Character,
                             Count = opener.Count - useCount,
@@ -280,7 +314,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     // No matching opener found
                     if (closer.CanOpen)
                     {
-                        this._delimiterStack.Push(closer);
+                        this._delimiterStack.Add(closer);
                     }
                 }
             }
@@ -406,7 +440,18 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         }
 
         var i = 0;
-        while (i < this._lines.Count)
+        this.ParseBlockStructureRange(ref i);
+    }
+
+    /// <summary>
+    /// Core block-structure parsing loop. Reads from this._lines starting at <paramref name="startIndex"/>
+    /// and adds parsed block nodes to this._currentParent. Callers set up _lines and _currentParent
+    /// before calling, and restore them afterwards.
+    /// </summary>
+    private void ParseBlockStructureRange(ref int startIndex)
+    {
+        var i = startIndex;
+        while (i < this._lines!.Count)
         {
             var line = this._lines[i];
             var trimmed = line.TrimStart();
@@ -494,8 +539,10 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                             };
 
                             // Move paragraph children to heading
-                            foreach (var child in paragraph.Children.ToList())
+                            var pChildren = paragraph.Children;
+                            for (var ci = 0; ci < pChildren.Count; ci++)
                             {
+                                var child = pChildren[ci];
                                 setextHeading.Children.Add(child);
                                 child.SetParent(setextHeading);
                             }
@@ -515,6 +562,8 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                 }
             }
         }
+
+        startIndex = i;
     }
 
     private void AddBlock(Node node)
@@ -933,33 +982,39 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         // Parse the div content recursively (it can contain any blocks)
         // Tags with colons (e.g., "C:Codeblock") are treated as literal content containers
         // and skip inner markdown parsing
-        var contentStr = string.Join("\n", divContent);
         var shouldParseContent = string.IsNullOrEmpty(name) || (name != null && !name.Contains(':'));
+
+        // Only compute the raw content string when needed (either for storage or literal tags).
+        var contentStr = shouldParseContent ? null : StringCompat.Join('\n', divContent);
 
         fencedDiv = new FencedDivNode
         {
             Tag = name,
             Attributes = attributes,
             OpeningFenceLength = fenceLength,
-            RawContent = contentStr,
+            RawContent = contentStr ?? string.Empty,
             Location = new SourceLocation(0, divContent.Count, lineIndex + 1, 1)
         };
 
-        // Only parse inner content for non-literal tags (tags without colons)
+        // Only parse inner content for non-literal tags (tags without colons).
+        // Reuse the current parser state (swap _lines) instead of spawning a new MarkdownParser
+        // instance + MemoryStream + UTF-8 encode/decode round-trip.
         if (shouldParseContent)
         {
-            var parser = new MarkdownParser(new MemoryStream(Encoding.UTF8.GetBytes(contentStr)));
-            var contentDoc = parser.Parse();
+            var savedLines = this._lines;
+            var savedParent = this._currentParent;
+            var savedIndex = currentIndex; // already past the closing fence
 
-            // Copy parsed content from the temporary document to the fenced div
-            if (contentDoc.HasChildren)
-            {
-                foreach (var child in contentDoc.Children)
-                {
-                    child.SetParent(fencedDiv);
-                    fencedDiv.Children.Add(child);
-                }
-            }
+            this._lines = divContent;
+            this._currentParent = fencedDiv;
+            var innerIndex = 0;
+
+            // Run the same block-structure loop used at the document level.
+            this.ParseBlockStructureRange(ref innerIndex);
+
+            this._lines = savedLines;
+            this._currentParent = savedParent;
+            // currentIndex is already correct (was set before we entered this branch).
         }
 
         // Parse attributes
@@ -1485,8 +1540,8 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                 lineTrimmed.StartsWith("```") ||
                 lineTrimmed.StartsWith("~~~") ||
                 (lineTrimmed.Length >= 4 && lineTrimmed.Substring(0, 4) == "    ") ||
-                Regex.IsMatch(lineTrimmed, @"^\s*[-*+]\s") ||
-                Regex.IsMatch(lineTrimmed, @"^\s*\d+[.)]\s"))
+                Regexes.BulletListLine.IsMatch(lineTrimmed) ||
+                Regexes.OrderedListLine.IsMatch(lineTrimmed))
             {
                 hasBlocks = true;
                 break;
@@ -1686,7 +1741,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         }
 
         // Normalize link reference id (collapse whitespace per CommonMark spec)
-        var normalizedId = Regex.Replace(id, @"\s+", " ").Trim();
+        var normalizedId = Regexes.WhitespaceCollapse.Replace(id, " ").Trim();
 
         definition = new LinkReferenceDefinition
         {
@@ -1713,10 +1768,10 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         var content = new StringBuilder();
 
         // Type 1: <script, <style, <pre, <iframe (followed by whitespace, >, or EOL)
-        if (this.IsHtmlBlockType1Start(trimmed))
+        if (IsHtmlBlockType1Start(trimmed))
         {
-            // Read until end tag found
-            var tagMatch = Regex.Match(trimmed, @"^<(script|style|pre|iframe)", RegexOptions.IgnoreCase);
+            // Read until end tag found (reuse the cached HtmlBlock1Start regex which captures group 1)
+            var tagMatch = Regexes.HtmlBlock1Start.Match(trimmed);
             var tagName = tagMatch.Groups[1].Value.ToLowerInvariant();
             var closingTag = $"</{tagName}>";
 
@@ -1937,7 +1992,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         }
 
         // Type 6: Start condition - opening tag or closing tag from predefined list
-        if (this.IsHtmlBlockType6Start(trimmed))
+        if (IsHtmlBlockType6Start(trimmed))
         {
             _ = content.Append(this._lines![currentIndex]);
             currentIndex++;
@@ -1960,7 +2015,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         }
 
         // Type 7: Complete open tag or closing tag (any tag except script, pre, style)
-        if (this.IsHtmlBlockType7Start(trimmed))
+        if (IsHtmlBlockType7Start(trimmed))
         {
             _ = content.Append(this._lines![currentIndex]);
             currentIndex++;
@@ -1985,28 +2040,24 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         return false;
     }
 
-    private bool IsHtmlBlockType1Start(string line)
+    private static bool IsHtmlBlockType1Start(string line)
     {
         // <script, <style, <pre, <iframe followed by whitespace, >, or EOL
-        var match = Regex.Match(line, @"^<(script|style|pre|iframe)(?:\s|>|$)", RegexOptions.IgnoreCase);
-        return match.Success;
+        return Regexes.HtmlBlock1Start.IsMatch(line);
     }
 
-    private bool IsHtmlBlockType6Start(string line)
+    private static bool IsHtmlBlockType6Start(string line)
     {
         // Opening or closing tag from predefined list, followed by whitespace, >, or EOL
-        var tagList = new[] { "address", "article", "aside", "base", "basefont", "blockquote", "body", "caption", "center", "col", "colgroup", "dd", "details", "dialog", "dir", "div", "dl", "dt", "fieldset", "figcaption", "figure", "footer", "form", "frame", "frameset", "h1", "h2", "h3", "h4", "h5", "h6", "head", "header", "hr", "html", "legend", "li", "link", "main", "menu", "menuitem", "meta", "nav", "noframes", "ol", "optgroup", "option", "param", "section", "source", "summary", "table", "tbody", "td", "tfoot", "th", "thead", "title", "tr", "track", "ul" };
-
-        var match = Regex.Match(line, @"^</?(" + string.Join("|", tagList) + @")(?:\s|>|$)", RegexOptions.IgnoreCase);
-        return match.Success;
+        return Regexes.HtmlBlock6Start.IsMatch(line);
     }
 
-    private bool IsHtmlBlockType7Start(string line)
+    private static bool IsHtmlBlockType7Start(string line)
     {
         // Complete open tag or closing tag (except script, pre, style) or self-closing tag, followed by whitespace or EOL
         // Very permissive - matches any valid HTML tag-like structure
-        var match = Regex.Match(line, @"^</?\w+(?:\s|[^>]*)?/?>?\s*$");
-        return match.Success && !Regex.IsMatch(line, @"^<(script|pre|style)(?:\s|>|$)", RegexOptions.IgnoreCase);
+        return Regexes.HtmlBlock7Start.IsMatch(line) &&
+               !Regexes.HtmlBlock7ExcludeStart.IsMatch(line);
     }
 
     private ParagraphNode? ParseParagraph(string line, int lineIndex, ref int currentIndex)
@@ -2071,8 +2122,8 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                (line.Length >= 3 && (line.StartsWith("---") || line.StartsWith("***") || line.StartsWith("___"))) ||
                line.StartsWith("```") ||
                line.StartsWith("~~~") ||
-               Regex.IsMatch(line, @"^\s*[-*+]\s") ||
-               Regex.IsMatch(line, @"^\s*\d+[.)]\s") ||
+               Regexes.BulletListLine.IsMatch(line) ||
+               Regexes.OrderedListLine.IsMatch(line) ||
                line.TrimStart().Length >= 4 && line.Substring(0, 4).All(c => c == ' ');
     }
 
@@ -2110,12 +2161,15 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             this.ParseInlineContent((MarkdownContainerNode)node);
         }
 
-        // Recursively process children
+        // Recursively process children.
+        // ParseInlineContent above has already finished rebuilding this container's children list,
+        // so we can iterate the list directly without a defensive copy.
         if (node is MarkdownContainerNode container)
         {
-            foreach (var child in container.Children.ToList())
+            var children = container.Children;
+            for (var ci = 0; ci < children.Count; ci++)
             {
-                this.WalkTreeAndParseInlines(child);
+                this.WalkTreeAndParseInlines(children[ci]);
             }
         }
     }
@@ -2147,52 +2201,81 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             textNode.Content = this.ApplySmartPunctuationToText(textNode.Content, originalText);
         }
 
-        // Recursively process children
+        // Recursively process children.
+        // Smart punctuation only mutates text node Content, not the children collection,
+        // so we can iterate directly without a defensive copy.
         if (node is MarkdownContainerNode containerNode)
         {
-            foreach (var child in containerNode.Children.ToList())
+            var children = containerNode.Children;
+            for (var ci = 0; ci < children.Count; ci++)
             {
-                this.WalkTreeAndApplySmartPunctuation(child, originalText);
+                this.WalkTreeAndApplySmartPunctuation(children[ci], originalText);
             }
         }
     }
 
     private void ParseInlineContent(MarkdownContainerNode container)
     {
-        // Store original text before inline parsing for smart punctuation
+        // Store original text before inline parsing for smart punctuation.
+        // We only need the first raw text node's content (the whole paragraph/heading text).
         string? originalText = null;
         if (container is ParagraphNode || container is HeadingNode)
         {
-            var firstMarkdownTextNode = container.Children.OfType<MarkdownTextNode>().FirstOrDefault();
-            if (firstMarkdownTextNode != null)
+            var children = container.Children;
+            for (var ci = 0; ci < children.Count; ci++)
             {
-                originalText = firstMarkdownTextNode.Content;
-                // Store original text for smart punctuation
-                if (this._originalTextMap != null)
+                if (children[ci] is MarkdownTextNode firstText)
                 {
-                    this._originalTextMap[container] = originalText;
+                    originalText = firstText.Content;
+                    if (this._originalTextMap != null)
+                    {
+                        this._originalTextMap[container] = originalText;
+                    }
+
+                    break;
                 }
             }
         }
 
-        // Find text nodes and parse them as inline content
-        var textNodes = container.Children.OfType<MarkdownTextNode>().ToList();
-        foreach (var textNode in textNodes)
+        // Single-pass rebuild: expand every MarkdownTextNode into its parsed inline nodes
+        // in-place by building a new list. This avoids O(n) IndexOf + O(n) Insert per node.
+        var old = container.Children;
+        var hasAnyText = false;
+        for (var ci = 0; ci < old.Count; ci++)
         {
-            var text = textNode.Content;
-            var newNodes = this.ParseInlineText(text, textNode.Location.Offset, originalText ?? text);
-
-            // Replace text node with parsed inline nodes
-            var index = container.Children.IndexOf(textNode);
-            container.Children.RemoveAt(index);
-
-            foreach (var newNode in newNodes)
+            if (old[ci] is MarkdownTextNode)
             {
-                newNode.SetParent(container);
-                container.Children.Insert(index, newNode);
-                index++;
+                hasAnyText = true;
+                break;
             }
         }
+
+        if (!hasAnyText)
+        {
+            return;
+        }
+
+        var rebuilt = new List<Node>(old.Count * 2);
+        for (var ci = 0; ci < old.Count; ci++)
+        {
+            var child = old[ci];
+            if (child is MarkdownTextNode textNode)
+            {
+                var newNodes = this.ParseInlineText(textNode.Content, textNode.Location.Offset, originalText ?? textNode.Content);
+                foreach (var newNode in newNodes)
+                {
+                    newNode.SetParent(container);
+                    rebuilt.Add(newNode);
+                }
+            }
+            else
+            {
+                rebuilt.Add(child);
+            }
+        }
+
+        container.Children.Clear();
+        container.Children.AddRange(rebuilt);
     }
 
     private List<Node> ParseInlineText(string text, int baseOffset, string originalText)
@@ -2541,7 +2624,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                         {
                             var refId = text.Substring(linkEnd + 2, refEnd - linkEnd - 2);
                             // Normalize reference id (collapse whitespace)
-                            var normalizedRefId = Regex.Replace(refId, @"\s+", " ").Trim();
+                            var normalizedRefId = Regexes.WhitespaceCollapse.Replace(refId, " ").Trim();
                             if (this._linkReferences!.TryGetValue(normalizedRefId, out var linkRef))
                             {
                                 var link = new LinkNode { Url = linkRef.Url, Title = linkRef.Title };
@@ -2556,7 +2639,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     {
                         // Shortcut reference: [text] where text matches a link reference id
                         // Normalize link text (collapse whitespace)
-                        var normalizedLinkText = Regex.Replace(linkText, @"\s+", " ").Trim();
+                        var normalizedLinkText = Regexes.WhitespaceCollapse.Replace(linkText, " ").Trim();
                         if (this._linkReferences!.TryGetValue(normalizedLinkText, out var shortcutRef))
                         {
                             var link = new LinkNode { Url = shortcutRef.Url, Title = shortcutRef.Title };
@@ -2989,8 +3072,11 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             i++;
         }
 
-        // Match quotes using delimiter stack algorithm
-        var matchedQuotes = new Dictionary<int, int>(); // opening pos -> closing pos
+        // Match quotes using delimiter stack algorithm.
+        // openingQuotePositions: opening pos -> closing pos  (O(1) lookup for opening quotes)
+        // closingQuotePositions: closing pos -> opening pos  (O(1) lookup — replaces ContainsValue)
+        var openingQuotePositions = new Dictionary<int, int>();
+        var closingQuotePositions = new Dictionary<int, int>();
         var openingQuotes = new Stack<(int pos, char type)>();
 
         foreach (var (pos, type) in quoteTypes)
@@ -3011,7 +3097,8 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             {
                 // Match with opening quote
                 var opening = openingQuotes.Pop();
-                matchedQuotes[opening.pos] = pos;
+                openingQuotePositions[opening.pos] = pos;
+                closingQuotePositions[pos] = opening.pos;
             }
             else
             {
@@ -3059,12 +3146,12 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     continue;
                 }
 
-                if (matchedQuotes.ContainsKey(i))
+                if (openingQuotePositions.ContainsKey(i))
                 {
                     // Opening quote
                     _ = result.Append('\u201C'); // Left double quotation mark
                 }
-                else if (matchedQuotes.ContainsValue(i))
+                else if (closingQuotePositions.ContainsKey(i))
                 {
                     // Closing quote
                     _ = result.Append('\u201D'); // Right double quotation mark
@@ -3101,12 +3188,12 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     // Apostrophe
                     _ = result.Append('\u2019'); // Right single quotation mark (apostrophe)
                 }
-                else if (matchedQuotes.ContainsKey(i))
+                else if (openingQuotePositions.ContainsKey(i))
                 {
                     // Opening quote
                     _ = result.Append('\u2018'); // Left single quotation mark
                 }
-                else if (matchedQuotes.ContainsValue(i))
+                else if (closingQuotePositions.ContainsKey(i))
                 {
                     // Closing quote
                     _ = result.Append('\u2019'); // Right single quotation mark

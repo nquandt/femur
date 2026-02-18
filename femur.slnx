@@ -187,6 +187,10 @@
     <Project Path="tests/Benchmark/Benchmark.csproj" />
   </Folder>
 
+  <Folder Name="/benchmarks/Markdown/">
+    <Project Path="benchmarks/Markdown/MarkdownBenchmarks.csproj" />
+  </Folder>
+
   <Folder Name="/tests/Test/">
     <Project Path="tests/Test/Test.csproj" />
   </Folder>
