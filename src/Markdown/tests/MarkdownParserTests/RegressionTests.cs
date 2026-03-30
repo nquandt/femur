@@ -759,6 +759,87 @@ Line 3
         Assert.Contains("br", htmlBlock.Content);
     }
 
+    [Fact]
+    public void Parse_HtmlBlockType6_PTag_ParsesAsHtmlBlock()
+    {
+        // Regression: <p> is a Type 6 block tag per CommonMark 0.31.2 spec.
+        // A <p> tag alone on its opening line should start a Type 6 HTML block.
+        var markdown = "<p>\nHello, world!\n</p>\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("<p>", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType6_PTagWithContentOnSameLine_ParsesAsHtmlBlock()
+    {
+        // Regression: <p>content</p> all on one line should be a Type 6 HTML block,
+        // not a paragraph with literal <p> tags. This is the pattern used by the
+        // Spanish-language page that was failing.
+        var markdown = "<p>Hola, soy Nick.</p>\n\nOtro párrafo.";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("<p>", htmlBlock.Content);
+        Assert.Contains("Hola, soy Nick.", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType6_PTagWithAttributes_ParsesAsHtmlBlock()
+    {
+        // Regression: <p> with class attributes (as used in the Spanish page header)
+        // should still be treated as a Type 6 HTML block.
+        var markdown = "<p class=\"text-gray-500\">Staff Engineer</p>\n\nParagraph";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        var htmlBlock = Assert.IsType<HtmlBlockNode>(result.Children[0]);
+        Assert.Contains("<p", htmlBlock.Content);
+        Assert.Contains("Staff Engineer", htmlBlock.Content);
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType6_SpanishPagePattern_ParsesCorrectly()
+    {
+        // Regression: Full pattern from the Spanish home page that was failing.
+        // Multiple <p>...</p> blocks on single lines inside a <div> should all
+        // be treated as part of a Type 6 HTML block (div), not parsed as markdown paragraphs.
+        var markdown = """
+<div class="flex flex-col gap-4 w-full">
+
+<p>Hola, soy Nick — un ingeniero de software con base en Milwaukee.</p>
+
+<p>Trabajo en <a href="/experience">Milwaukee Tool</a> como ingeniero de software.</p>
+
+</div>
+""";
+        var result = MarkdownParserInstance.Parse(markdown);
+
+        // The opening <div> starts a Type 6 HTML block that ends at the blank line after it.
+        // Each subsequent <p> block, separated by blank lines, also starts its own Type 6 HTML block.
+        // None of the children should be plain ParagraphNodes with literal <p> text.
+        foreach (var child in result.Children)
+        {
+            Assert.IsType<HtmlBlockNode>(child);
+        }
+    }
+
+    [Fact]
+    public void Parse_HtmlBlockType6_PTagVsEnglishPagePattern_BothParseSameWay()
+    {
+        // Regression: The English page used <p> on its own line (which worked via Type 7),
+        // while the Spanish page used <p>content</p> on one line (which failed).
+        // After the fix, both should produce HtmlBlockNodes.
+        var englishStyle = "<p>\nHey, I'm Nick.\n</p>\n\nNext paragraph.";
+        var spanishStyle = "<p>Hola, soy Nick.</p>\n\nNext paragraph.";
+
+        var englishResult = MarkdownParserInstance.Parse(englishStyle);
+        var spanishResult = MarkdownParserInstance.Parse(spanishStyle);
+
+        Assert.IsType<HtmlBlockNode>(englishResult.Children[0]);
+        Assert.IsType<HtmlBlockNode>(spanishResult.Children[0]);
+    }
+
     #endregion
 
     #region Setext vs Thematic Break Precedence Tests (December 1, 2025)

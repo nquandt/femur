@@ -39,11 +39,17 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             new Regex(@"^<(script|style|pre|iframe)(?:\s|>|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         // Block-6 tag list compiled once.
+        // Per CommonMark 0.31.2 spec section 4.6, this includes: address, article, aside, base,
+        // basefont, blockquote, body, caption, center, col, colgroup, dd, details, dialog, dir,
+        // div, dl, dt, fieldset, figcaption, figure, footer, form, frame, frameset, h1-h6, head,
+        // header, hr, html, iframe, legend, li, link, main, menu, menuitem, nav, noframes, ol,
+        // optgroup, option, p, param, search, section, summary, table, tbody, td, tfoot, th,
+        // thead, title, tr, track, ul
         private const string Block6Tags =
             "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|" +
             "details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|" +
-            "h1|h2|h3|h4|h5|h6|head|header|hr|html|legend|li|link|main|menu|menuitem|meta|nav|" +
-            "noframes|ol|optgroup|option|param|section|source|summary|table|tbody|td|tfoot|th|" +
+            "h1|h2|h3|h4|h5|h6|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|" +
+            "noframes|ol|optgroup|option|p|param|search|section|source|summary|table|tbody|td|tfoot|th|" +
             "thead|title|tr|track|ul";
 
         internal static readonly Regex HtmlBlock6Start =
