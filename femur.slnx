@@ -165,17 +165,14 @@
 
   <Folder Name="/src/Html/tests/">
     <Project Path="src/Html/tests/HtmlParserTests/HtmlParserTests.csproj" />
-    <Project Path="src/Html/tests/HtmlParserTests.NetStandard20/HtmlParserTests.NetStandard20.csproj" />
   </Folder>
 
   <Folder Name="/src/Xml/tests/">
     <Project Path="src/Xml/tests/XmlParserTests/XmlParserTests.csproj" />
-    <Project Path="src/Xml/tests/XmlParserTests.NetStandard20/XmlParserTests.NetStandard20.csproj" />
   </Folder>
 
   <Folder Name="/src/Markdown/tests/">
     <Project Path="src/Markdown/tests/MarkdownParserTests/MarkdownParserTests.csproj" />
-    <Project Path="src/Markdown/tests/MarkdownParserTests.NetStandard20/MarkdownParserTests.NetStandard20.csproj" />
     <Project Path="src/Markdown/tests/MarkdownRendererTests/MarkdownRendererTests.csproj" />
   </Folder>
 

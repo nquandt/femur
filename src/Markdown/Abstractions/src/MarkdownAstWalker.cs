@@ -15,10 +15,7 @@ public abstract class MarkdownAstWalker
     /// </summary>
     public void Walk(MarkdownDocumentNode document)
     {
-        if (document == null)
-        {
-            throw new ArgumentNullException(nameof(document));
-        }
+        ArgumentNullException.ThrowIfNull(document);
 
         this.VisitDocument(document);
     }

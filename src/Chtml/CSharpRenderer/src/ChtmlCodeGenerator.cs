@@ -347,7 +347,7 @@ public class ChtmlCodeGenerator
 
     private void WriteLine(string text)
     {
-        _sb.Append(new string(' ', _indentLevel * 4));
+        _sb.Append(' ', _indentLevel * 4);
         _sb.AppendLine(text);
     }
 

@@ -1978,7 +1978,7 @@ public class ChtmlParser : StreamParser<ChtmlDocumentNode>
                         }
                         // Not a closing - this is dashes in the comment content
                         // Add all but one dash to content, keep one for next check
-                        this.StringBuilder.Append(new string('-', dashCount - 1));
+                        this.StringBuilder.Append('-', dashCount - 1);
                         dashCount = 1;
                         continue;
                     }
@@ -1988,7 +1988,7 @@ public class ChtmlParser : StreamParser<ChtmlDocumentNode>
                     // Not a dash - flush any accumulated dashes and add character
                     if (dashCount > 0)
                     {
-                        this.StringBuilder.Append(new string('-', dashCount));
+                        this.StringBuilder.Append('-', dashCount);
                         dashCount = 0;
                     }
 

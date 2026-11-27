@@ -643,7 +643,7 @@ public class HtmlParser : StreamParser<DocumentNode>
                     }
                     // Not a closing - this is dashes in the comment content
                     // Add all but one dash to content, keep one for next check
-                    _ = this.StringBuilder.Append(new string('-', dashCount - 1));
+                    _ = this.StringBuilder.Append('-', dashCount - 1);
                     dashCount = 1;
                     continue;
                 }
@@ -653,7 +653,7 @@ public class HtmlParser : StreamParser<DocumentNode>
                 // Not a dash - flush any accumulated dashes and add character
                 if (dashCount > 0)
                 {
-                    _ = this.StringBuilder.Append(new string('-', dashCount));
+                    _ = this.StringBuilder.Append('-', dashCount);
                     dashCount = 0;
                 }
 
@@ -736,7 +736,7 @@ public class HtmlParser : StreamParser<DocumentNode>
                 // Any brackets beyond the two closing ones are content
                 if (bracketCount > 2)
                 {
-                    _ = this.StringBuilder.Append(new string(']', bracketCount - 2));
+                    _ = this.StringBuilder.Append(']', bracketCount - 2);
                 }
 
                 break;
@@ -746,7 +746,7 @@ public class HtmlParser : StreamParser<DocumentNode>
                 // Not a closing sequence — flush accumulated brackets as content
                 if (bracketCount > 0)
                 {
-                    _ = this.StringBuilder.Append(new string(']', bracketCount));
+                    _ = this.StringBuilder.Append(']', bracketCount);
                     bracketCount = 0;
                 }
 

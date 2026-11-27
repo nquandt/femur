@@ -30,10 +30,7 @@ public class MarkdownHtmlStreamingRenderer : MarkdownStreamingRenderer
     /// <param name="encoding">The text encoding to use (defaults to UTF-8)</param>
     public MarkdownHtmlStreamingRenderer(Stream stream, Encoding? encoding = null)
     {
-        if (stream == null)
-        {
-            throw new ArgumentNullException(nameof(stream));
-        }
+        ArgumentNullException.ThrowIfNull(stream);
 
         this._writer = new StreamWriter(stream, encoding ?? Encoding.UTF8);
         this._ownsWriter = true;

@@ -64,11 +64,7 @@ internal static class OpenGenericProxyGenerator
         // Generate interface implementation
         ImplementInterface(typeBuilder, openGenericInterface, closedInterface, innerField);
 
-#if NETSTANDARD2_0
-        return typeBuilder.CreateTypeInfo()!.AsType();
-#else
         return typeBuilder.CreateType()!;
-#endif
     }
 
     private static void CopyGenericConstraints(

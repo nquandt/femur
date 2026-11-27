@@ -61,10 +61,7 @@ public abstract class StreamParser<TDocument> : IDisposable where TDocument : No
     /// <param name="leaveOpen">true to leave the stream open after the parser is disposed; otherwise, false (default false)</param>
     protected StreamParser(Stream stream, int bufferSize = 4096, bool leaveOpen = false)
     {
-        if (stream == null)
-        {
-            throw new ArgumentNullException(nameof(stream));
-        }
+        ArgumentNullException.ThrowIfNull(stream);
 
         this.Reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: bufferSize, leaveOpen: leaveOpen);
         this.Buffer = ArrayPool<char>.Shared.Rent(bufferSize);

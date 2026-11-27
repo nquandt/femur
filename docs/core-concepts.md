@@ -326,13 +326,11 @@ Core abstractions are defined as interfaces:
 
 **Why:** Interfaces are contracts that enable flexibility and testability.
 
-### Multi-Targeting
+### Target Framework
 
-Femur packages target:
-- **netstandard2.0**: Maximum compatibility (works on .NET Framework 4.7.2+, .NET Core 2.0+, .NET 5+) — parser, markup, DI, and logging packages
-- **net10.0**: Current LTS, with runtime-specific optimizations
+All Femur packages target **net10.0** (current LTS) only.
 
-**Why:** Libraries should work in diverse environments (legacy .NET Framework, modern .NET) while taking advantage of newer runtime improvements when available.
+**Why:** A single modern target lets the libraries use current runtime APIs (spans everywhere, `HashCode`, `ArgumentNullException.ThrowIfNull`, etc.) directly, without compatibility shims or `#if` branches.
 
 ### Memory Efficiency
 

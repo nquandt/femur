@@ -1,5 +1,5 @@
+using System.Globalization;
 using System.Text;
-using Femur.Markdown.Parser.Compatibility;
 
 namespace Femur.Markdown.Parser.Streaming;
 
@@ -416,7 +416,7 @@ public sealed class MarkdownStreamingParser : IDisposable
                 (trimmed[digits + 1] == ' ' || trimmed[digits + 1] == '\t'))
             {
                 isOrdered = true;
-                startNum = Int32Compat.Parse(trimmed.AsSpan(0, digits));
+                startNum = int.Parse(trimmed.AsSpan(0, digits), NumberStyles.Integer, CultureInfo.InvariantCulture);
                 markerLen = digits + 1;
             }
         }
