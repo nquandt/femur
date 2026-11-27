@@ -1,9 +1,0 @@
-<Project>
-  <!--
-    Projects that also target netstandard2.0 share source across frameworks, and
-    ArgumentNullException.ThrowIfNull does not exist on netstandard2.0.
-  -->
-  <PropertyGroup Condition="$(TargetFrameworks.Contains('netstandard2.0'))">
-    <NoWarn>$(NoWarn);CA1510</NoWarn>
-  </PropertyGroup>
-</Project>

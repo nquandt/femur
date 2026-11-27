@@ -2,9 +2,6 @@ using System.Text;
 using Femur.Parsing.Nodes;
 using Femur.Markdown.Abstractions;
 using Femur.Markdown.Abstractions.Nodes;
-#if NETSTANDARD2_0
-using Femur.Markdown.Renderer.Extensions;
-#endif
 
 
 namespace Femur.Markdown.Renderer;

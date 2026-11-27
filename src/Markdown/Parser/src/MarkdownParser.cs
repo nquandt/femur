@@ -1,9 +1,9 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Femur.Parsing;
 using Femur.Parsing.Nodes;
 using Femur.Markdown.Abstractions.Nodes;
-using Femur.Markdown.Parser.Compatibility;
 
 namespace Femur.Markdown.Parser;
 
@@ -991,7 +991,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         var shouldParseContent = string.IsNullOrEmpty(name) || (name != null && !name.Contains(':'));
 
         // Only compute the raw content string when needed (either for storage or literal tags).
-        var contentStr = shouldParseContent ? null : StringCompat.Join('\n', divContent);
+        var contentStr = shouldParseContent ? null : string.Join('\n', divContent);
 
         fencedDiv = new FencedDivNode
         {
@@ -1310,7 +1310,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             if (numberEnd < trimmed.Length && (trimmed[numberEnd] == '.' || trimmed[numberEnd] == ')'))
             {
                 isOrdered = true;
-                if (!Int32Compat.TryParse(trimmed.AsSpan(0, numberEnd), out startNumber))
+                if (!int.TryParse(trimmed.AsSpan(0, numberEnd), NumberStyles.Integer, CultureInfo.InvariantCulture, out startNumber))
                 {
                     startNumber = 1;
                 }
@@ -1609,7 +1609,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         else
         {
             // Create paragraph from content
-            var content = StringCompat.Join('\n', contentLines).TrimEnd();
+            var content = string.Join('\n', contentLines).TrimEnd();
             if (!string.IsNullOrWhiteSpace(content))
             {
                 var paragraph = new ParagraphNode();
@@ -2093,7 +2093,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             currentIndex++;
         }
 
-        var content = StringCompat.Join('\n', contentLines);
+        var content = string.Join('\n', contentLines);
         if (string.IsNullOrWhiteSpace(content))
         {
             return null;
@@ -2480,7 +2480,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     // Decimal entity: &#123;
                     if (entityContent.StartsWith('#') && entityContent.Length > 1 && char.IsDigit(entityContent[1]))
                     {
-                        if (Int32Compat.TryParse(entityContent.AsSpan(1), out var codePoint) && codePoint >= 0 && codePoint <= 0x10FFFF)
+                        if (int.TryParse(entityContent.AsSpan(1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var codePoint) && codePoint >= 0 && codePoint <= 0x10FFFF)
                         {
                             // Flush current text
                             if (currentText.Length > 0)
@@ -2506,7 +2506,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     // Hex entity: &#x1F600;
                     if (entityContent.StartsWith("#x", StringComparison.OrdinalIgnoreCase) && entityContent.Length > 2)
                     {
-                        if (Int32Compat.TryParse(entityContent.AsSpan(2), System.Globalization.NumberStyles.HexNumber, null, out var hexCodePoint) && hexCodePoint >= 0 && hexCodePoint <= 0x10FFFF)
+                        if (int.TryParse(entityContent.AsSpan(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var hexCodePoint) && hexCodePoint >= 0 && hexCodePoint <= 0x10FFFF)
                         {
                             // Flush current text
                             if (currentText.Length > 0)

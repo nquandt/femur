@@ -43,10 +43,6 @@ block parsing. That is the structural difference we need to close.
   `ReadMore`, `GetAbsolutePosition`, `SkipWhitespace`, `ReadUntil`, `ReadUntilAny`)
   must remain. The `TestStreamParser` test harness reflects exactly what must survive.
 
-- **`netstandard2.0` target must be preserved.**  
-  New code must either work on `netstandard2.0` or be guarded by `#if` with a
-  `netstandard2.0` fallback. The `Compatibility/` shims are the pattern to follow.
-
 - **All 274 parser tests and 200 renderer tests must remain green after every step.**
 
 ---
@@ -496,7 +492,7 @@ On a span this is a direct scan with no allocation.
 
 `ReadOnlySpan<char>` cannot be stored as a field or captured in a lambda. The existing
 `CommonMarkDelimiterProcessor` currently takes a `string _text`. It will need to either:
-- Accept a `ReadOnlyMemory<char>` (storable as a field on `netstandard2.0`), or
+- Accept a `ReadOnlyMemory<char>` (storable as a field), or
 - Continue to receive a `string` (call `.ToString()` once at the delimiter processor
   boundary — one allocation per paragraph, acceptable).
 
@@ -576,14 +572,6 @@ on Phase 2 being stable. Phase 5 depends on Phases 3 and 4.
 The current `ProcessCharacter` has careful `\r\n` collapse logic. This moves into
 `ReadLineIntoBuffer` in Phase 4. The **same test cases** that currently cover Windows
 line endings will validate the new implementation. No new tests needed — just run them.
-
-### `netstandard2.0` span support
-`ReadOnlySpan<char>` is available on `netstandard2.1+` and `net5+`. On
-`netstandard2.0` it is available via the `System.Memory` NuGet package, which
-`Femur.Parsing` already implicitly depends on (the `Compatibility/` shims reference
-`ReadOnlySpan<char>` and `StringBuilder.Append(ReadOnlySpan<char>)` already). Verify
-the `<PackageReference>` for `System.Memory` is explicit in the `netstandard2.0`
-target, or add it.
 
 ### `ArrayPool` source buffer growth
 The source buffer that holds all input chars must handle documents of arbitrary size.

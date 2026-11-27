@@ -20,14 +20,7 @@ internal sealed class ScopeTracker : IDisposable
 
     public ScopedSourceProvider GetOrCreateScopedProvider(IServiceProvider targetScopeProvider)
     {
-#if NETSTANDARD2_0
-        if (this._disposed)
-        {
-            throw new ObjectDisposedException(nameof(ScopeTracker));
-        }
-#else
         ObjectDisposedException.ThrowIf(this._disposed, this);
-#endif
 
         if (this._scopeMap.TryGetValue(targetScopeProvider, out var existing))
         {

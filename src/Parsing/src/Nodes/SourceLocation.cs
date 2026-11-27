@@ -51,19 +51,7 @@ public struct SourceLocation : IEquatable<SourceLocation>
 
     public override int GetHashCode()
     {
-#if NETSTANDARD2_0
-        unchecked
-        {
-            var hash = 17;
-            hash = hash * 23 + this.Offset.GetHashCode();
-            hash = hash * 23 + this.Length.GetHashCode();
-            hash = hash * 23 + this.Line.GetHashCode();
-            hash = hash * 23 + this.Column.GetHashCode();
-            return hash;
-        }
-#else
         return HashCode.Combine(this.Offset, this.Length, this.Line, this.Column);
-#endif
     }
 
     public static bool operator ==(SourceLocation left, SourceLocation right)
