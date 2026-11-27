@@ -531,7 +531,7 @@ public sealed class MarkdownStreamingParser : IDisposable
             if (trimmed.Length > 0 &&
                 (trimmed[0] == '#' || trimmed[0] == '>' ||
                  this.IsThematicBreak(trimmed) ||
-                 trimmed.StartsWith("```") || trimmed.StartsWith("~~~")))
+                 trimmed.StartsWith("```", StringComparison.Ordinal) || trimmed.StartsWith("~~~", StringComparison.Ordinal)))
             {
                 break;
             }
@@ -821,7 +821,7 @@ public sealed class MarkdownStreamingParser : IDisposable
         if (count >= 2)
         {
             var closeMarker = new string(marker, 2);
-            var closeIndex = text.IndexOf(closeMarker, i);
+            var closeIndex = text.IndexOf(closeMarker, i, StringComparison.Ordinal);
             if (closeIndex != -1)
             {
                 var emphText = text.AsSpan(i, closeIndex - i).ToString();

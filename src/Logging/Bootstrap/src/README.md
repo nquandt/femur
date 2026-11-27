@@ -225,9 +225,9 @@ The Femur.Hosting framework provides comprehensive error handling, graceful shut
 
 ## Requirements
 
-- .NET 8.0 or later (also supports .NET Standard 2.0)
-- Microsoft.Extensions.Logging 8.0+
-- Microsoft.Extensions.DependencyInjection 8.0+
+- .NET 10.0 or later (also supports .NET Standard 2.0)
+- Microsoft.Extensions.Logging 10.0+
+- Microsoft.Extensions.DependencyInjection 10.0+
 - Femur.DependencyInjection (automatically included)
 
 ## License

@@ -20,7 +20,7 @@ public class InMemoryFileSystem : IFileSystem
     {
         var fullPath = new Uri(Path.Join(this._rootDirectory.AbsoluteUri, path)).AbsoluteUri;
 
-        if (!fullPath.StartsWith(this._rootDirectory.AbsoluteUri))
+        if (!fullPath.StartsWith(this._rootDirectory.AbsoluteUri, StringComparison.Ordinal))
         {
             throw new UnauthorizedAccessException("Access outside of root directory is not allowed.");
         }
@@ -37,14 +37,14 @@ public class InMemoryFileSystem : IFileSystem
     public Task<IEnumerable<string>> GetFilesAsync(string directoryPath, bool recursive = false, CancellationToken cancellationToken = default)
     {
         var resolvedPath = this.ResolvePath(directoryPath);
-        var files = this._files.Keys.Where(f => f.StartsWith(resolvedPath)).ToList();
+        var files = this._files.Keys.Where(f => f.StartsWith(resolvedPath, StringComparison.Ordinal)).ToList();
         return Task.FromResult<IEnumerable<string>>(files);
     }
 
     public Task<IEnumerable<string>> GetDirectoriesAsync(string directoryPath, bool recursive = false, CancellationToken cancellationToken = default)
     {
         var resolvedPath = this.ResolvePath(directoryPath);
-        var directories = this._directories.Where(d => d.StartsWith(resolvedPath)).ToList();
+        var directories = this._directories.Where(d => d.StartsWith(resolvedPath, StringComparison.Ordinal)).ToList();
         return Task.FromResult<IEnumerable<string>>(directories);
     }
 
@@ -88,14 +88,14 @@ public class InMemoryFileSystem : IFileSystem
 
         if (recursive)
         {
-            foreach (var file in this._files.Keys.Where(f => f.StartsWith(resolvedPath)).ToList())
+            foreach (var file in this._files.Keys.Where(f => f.StartsWith(resolvedPath, StringComparison.Ordinal)).ToList())
             {
                 _ = this._files.TryRemove(file, out _);
             }
 
-            _ = this._directories.RemoveWhere(d => d.StartsWith(resolvedPath));
+            _ = this._directories.RemoveWhere(d => d.StartsWith(resolvedPath, StringComparison.Ordinal));
         }
-        else if (this._files.Keys.Any(f => f.StartsWith(resolvedPath)))
+        else if (this._files.Keys.Any(f => f.StartsWith(resolvedPath, StringComparison.Ordinal)))
         {
             throw new IOException("Directory is not empty");
         }
