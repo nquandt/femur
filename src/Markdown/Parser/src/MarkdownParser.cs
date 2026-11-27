@@ -1543,8 +1543,8 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             // Check for block-level constructs
             if (lineTrimmed.StartsWith('#') ||
                 lineTrimmed.StartsWith('>') ||
-                lineTrimmed.StartsWith("```") ||
-                lineTrimmed.StartsWith("~~~") ||
+                lineTrimmed.StartsWith("```", StringComparison.Ordinal) ||
+                lineTrimmed.StartsWith("~~~", StringComparison.Ordinal) ||
                 (lineTrimmed.Length >= 4 && lineTrimmed.Substring(0, 4) == "    ") ||
                 Regexes.BulletListLine.IsMatch(lineTrimmed) ||
                 Regexes.OrderedListLine.IsMatch(lineTrimmed))
@@ -1818,14 +1818,14 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         }
 
         // Type 2: HTML comment <!-- ... -->
-        if (trimmed.StartsWith("<!--"))
+        if (trimmed.StartsWith("<!--", StringComparison.Ordinal))
         {
             var startLine = this._lines![currentIndex];
             _ = content.Append(startLine);
             currentIndex++;
 
             // Check if closing --> is on the same line
-            var closingIndex = startLine.IndexOf("-->");
+            var closingIndex = startLine.IndexOf("-->", StringComparison.Ordinal);
             if (closingIndex >= 0)
             {
                 // Closing is on the same line - extract only up to and including -->
@@ -1839,7 +1839,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             while (currentIndex < this._lines!.Count)
             {
                 var currentLine = this._lines[currentIndex];
-                var lineClosingIndex = currentLine.IndexOf("-->");
+                var lineClosingIndex = currentLine.IndexOf("-->", StringComparison.Ordinal);
 
                 if (lineClosingIndex >= 0)
                 {
@@ -1863,14 +1863,14 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         }
 
         // Type 3: Processing instruction <? ... ?>
-        if (trimmed.StartsWith("<?"))
+        if (trimmed.StartsWith("<?", StringComparison.Ordinal))
         {
             var startLine = this._lines![currentIndex];
             _ = content.Append(startLine);
             currentIndex++;
 
             // Check if closing ?> is on the same line
-            var closingIndex = startLine.IndexOf("?>");
+            var closingIndex = startLine.IndexOf("?>", StringComparison.Ordinal);
             if (closingIndex >= 0)
             {
                 // Closing is on the same line - extract only up to and including ?>
@@ -1884,7 +1884,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             while (currentIndex < this._lines!.Count)
             {
                 var currentLine = this._lines[currentIndex];
-                var lineClosingIndex = currentLine.IndexOf("?>");
+                var lineClosingIndex = currentLine.IndexOf("?>", StringComparison.Ordinal);
 
                 if (lineClosingIndex >= 0)
                 {
@@ -1908,7 +1908,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         }
 
         // Type 4: Declaration <! followed by uppercase ASCII letter
-        if (trimmed.StartsWith("<!") && trimmed.Length > 2 && char.IsUpper(trimmed[2]))
+        if (trimmed.StartsWith("<!", StringComparison.Ordinal) && trimmed.Length > 2 && char.IsUpper(trimmed[2]))
         {
             var startLine = this._lines![currentIndex];
             _ = content.Append(startLine);
@@ -1953,14 +1953,14 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
         }
 
         // Type 5: CDATA section <![CDATA[ ... ]]>
-        if (trimmed.StartsWith("<![CDATA["))
+        if (trimmed.StartsWith("<![CDATA[", StringComparison.Ordinal))
         {
             var startLine = this._lines![currentIndex];
             _ = content.Append(startLine);
             currentIndex++;
 
             // Check if closing ]]> is on the same line
-            var closingIndex = startLine.IndexOf("]]>");
+            var closingIndex = startLine.IndexOf("]]>", StringComparison.Ordinal);
             if (closingIndex >= 0)
             {
                 // Closing is on the same line - extract only up to and including ]]>
@@ -1974,7 +1974,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
             while (currentIndex < this._lines!.Count)
             {
                 var currentLine = this._lines[currentIndex];
-                var lineClosingIndex = currentLine.IndexOf("]]>");
+                var lineClosingIndex = currentLine.IndexOf("]]>", StringComparison.Ordinal);
 
                 if (lineClosingIndex >= 0)
                 {
@@ -2113,7 +2113,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
     private bool IsBlockStart(string line)
     {
         // Check for fenced div: ::: followed by at least one non-space character (the attributes)
-        if (line.Length >= 4 && line.StartsWith(":::"))
+        if (line.Length >= 4 && line.StartsWith(":::", StringComparison.Ordinal))
         {
             // Must have attributes after the colons to be an opening fence
             var afterColons = line.Substring(3).TrimStart();
@@ -2125,9 +2125,9 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
 
         return line.StartsWith('#') ||
                line.StartsWith('>') ||
-               (line.Length >= 3 && (line.StartsWith("---") || line.StartsWith("***") || line.StartsWith("___"))) ||
-               line.StartsWith("```") ||
-               line.StartsWith("~~~") ||
+               (line.Length >= 3 && (line.StartsWith("---", StringComparison.Ordinal) || line.StartsWith("***", StringComparison.Ordinal) || line.StartsWith("___", StringComparison.Ordinal))) ||
+               line.StartsWith("```", StringComparison.Ordinal) ||
+               line.StartsWith("~~~", StringComparison.Ordinal) ||
                Regexes.BulletListLine.IsMatch(line) ||
                Regexes.OrderedListLine.IsMatch(line) ||
                line.TrimStart().Length >= 4 && line.Substring(0, 4).All(c => c == ' ');
@@ -2233,10 +2233,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                 if (children[ci] is MarkdownTextNode firstText)
                 {
                     originalText = firstText.Content;
-                    if (this._originalTextMap != null)
-                    {
-                        this._originalTextMap[container] = originalText;
-                    }
+                    this._originalTextMap?[container] = originalText;
 
                     break;
                 }
@@ -2384,7 +2381,7 @@ public class MarkdownParser : StreamParser<MarkdownDocumentNode>
                     var content = text.Substring(i + 1, closeIdx - i - 1);
 
                     // Check if it's a URL autolink
-                    if (content.Contains("://") && (content.StartsWith("http://") || content.StartsWith("https://") || content.StartsWith("ftp://")))
+                    if (content.Contains("://") && (content.StartsWith("http://", StringComparison.Ordinal) || content.StartsWith("https://", StringComparison.Ordinal) || content.StartsWith("ftp://", StringComparison.Ordinal)))
                     {
                         // Flush current text
                         if (currentText.Length > 0)

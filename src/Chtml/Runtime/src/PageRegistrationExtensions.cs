@@ -31,7 +31,7 @@ public static class PageRegistrationExtensions
 
                 var renderContext = RenderContext<TGlobalProps>.Create(ctx.Response.BodyWriter, globalProps);
                 await T.RenderAsync(renderContext, EmptyProps.Instance);
-                await ctx.Response.BodyWriter.FlushAsync();
+                await ctx.Response.BodyWriter.FlushAsync(ctx.RequestAborted);
             }
         ).WithName(routeName);
 
@@ -72,7 +72,7 @@ public static class PageRegistrationExtensions
                     await T.RenderAsync(renderContext, props);
                 }
 
-                await ctx.Response.BodyWriter.FlushAsync();
+                await ctx.Response.BodyWriter.FlushAsync(ctx.RequestAborted);
             }
         ).WithName(routeName);
 

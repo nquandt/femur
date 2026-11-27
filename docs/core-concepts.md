@@ -328,11 +328,9 @@ Core abstractions are defined as interfaces:
 
 ### Multi-Targeting
 
-Femur packages target multiple .NET versions:
-- **netstandard2.0**: Maximum compatibility (works on .NET Framework 4.7.2+, .NET Core 2.0+, .NET 5+)
-- **net8.0**: LTS version with performance optimizations
-- **net9.0**: STS version with latest features
-- **net10.0**: Cutting-edge support
+Femur packages target:
+- **netstandard2.0**: Maximum compatibility (works on .NET Framework 4.7.2+, .NET Core 2.0+, .NET 5+) — parser, markup, DI, and logging packages
+- **net10.0**: Current LTS, with runtime-specific optimizations
 
 **Why:** Libraries should work in diverse environments (legacy .NET Framework, modern .NET) while taking advantage of newer runtime improvements when available.
 

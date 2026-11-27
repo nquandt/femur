@@ -495,7 +495,7 @@ public sealed class MarkdownStreamingParser<TRenderer> : IDisposable
 
             // Stop at block-level element
             var trimmed = line.TrimStart();
-            if (trimmed.StartsWith('#') || trimmed.StartsWith('>') || trimmed.StartsWith("```") || trimmed.StartsWith("~~~"))
+            if (trimmed.StartsWith('#') || trimmed.StartsWith('>') || trimmed.StartsWith("```", StringComparison.Ordinal) || trimmed.StartsWith("~~~", StringComparison.Ordinal))
             {
                 break;
             }

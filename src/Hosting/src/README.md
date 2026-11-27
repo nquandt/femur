@@ -308,6 +308,4 @@ For ASP.NET Core applications, use **Femur.Hosting.Web** which provides `WebAppl
 
 ## Target Frameworks
 
-- .NET 8.0 (LTS)
-- .NET 9.0 (STS)
-- .NET 10.0
+- .NET 10.0 (LTS)

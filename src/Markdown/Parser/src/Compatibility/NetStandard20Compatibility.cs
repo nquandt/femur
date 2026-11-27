@@ -6,6 +6,7 @@ using System.Text;
 #pragma warning restore IDE0005 // Using directive is unnecessary
 
 #pragma warning disable SA1649 // File name should match first type name
+#pragma warning disable MA0048 // File name must match type name
 #pragma warning disable IDE0161 // Convert to file-scoped namespace
 namespace Femur.Markdown.Parser.Compatibility
 {

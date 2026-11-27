@@ -5,13 +5,6 @@ using Femur.Parsing.Nodes;
 namespace Femur.Parsing;
 
 /// <summary>
-/// Callback delegate invoked when a new node is created during parsing.
-/// Allows consumers to track and aggregate node data without re-walking the AST.
-/// </summary>
-/// <param name="node">The newly created node</param>
-public delegate void NodeCreatedCallback(Node node);
-
-/// <summary>
 /// Base class for streaming parsers that read from a Stream and build an AST.
 /// Provides shared buffer management and parsing utilities.
 /// 

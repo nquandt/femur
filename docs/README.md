@@ -140,7 +140,7 @@ Femur leverages proven software design patterns:
 - **Async/await first** - All I/O operations fully async
 - **Dependency injection** - Built on Microsoft.Extensions.DependencyInjection
 - **Interface-based design** - Testable and flexible
-- **Multi-targeting** - netstandard2.0, net8.0, net9.0, net10.0 support
+- **Multi-targeting** - netstandard2.0 and net10.0 support
 - **Memory efficiency** - Streaming parsers, buffer pooling, minimal allocations
 
 ## See Also

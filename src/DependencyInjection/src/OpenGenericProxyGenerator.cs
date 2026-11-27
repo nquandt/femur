@@ -25,13 +25,13 @@ internal static class OpenGenericProxyGenerator
         if (!openGenericInterface.IsInterface)
         {
             throw new ArgumentException(
-                $"Cannot create dynamic proxy for non-interface type: {openGenericInterface}");
+                $"Cannot create dynamic proxy for non-interface type: {openGenericInterface}", nameof(openGenericInterface));
         }
 
         if (!openGenericInterface.IsGenericTypeDefinition)
         {
             throw new ArgumentException(
-                $"Expected open generic type definition, got: {openGenericInterface}");
+                $"Expected open generic type definition, got: {openGenericInterface}", nameof(openGenericInterface));
         }
 
         var genericArgs = openGenericInterface.GetGenericArguments();

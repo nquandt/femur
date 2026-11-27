@@ -127,7 +127,7 @@ Demonstrates integration with .NET ecosystem while using Femur's hosting framewo
 
 ### Prerequisites
 
-- .NET 9.0 SDK or later
+- .NET 10.0 SDK or later
 - Internet connection (to fetch from JSONPlaceholder API)
 
 ### Steps

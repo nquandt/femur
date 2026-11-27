@@ -16,7 +16,7 @@ public class DefaultFileSystem : IFileSystem
     private string ResolvePath(string path)
     {
         var fullPath = Path.GetFullPath(Path.Combine(this._rootDirectory, path));
-        if (!fullPath.StartsWith(this._rootDirectory))
+        if (!fullPath.StartsWith(this._rootDirectory, StringComparison.Ordinal))
         {
             throw new UnauthorizedAccessException("Access outside of root directory is not allowed.");
         }

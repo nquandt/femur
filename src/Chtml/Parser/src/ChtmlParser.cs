@@ -2000,7 +2000,7 @@ public class ChtmlParser : StreamParser<ChtmlDocumentNode>
 
             // Clean up trailing dashes if comment ended abruptly
             var content = this.StringBuilder.ToString();
-            if (content.EndsWith("--"))
+            if (content.EndsWith("--", StringComparison.Ordinal))
             {
                 content = content.Substring(0, content.Length - 2);
             }

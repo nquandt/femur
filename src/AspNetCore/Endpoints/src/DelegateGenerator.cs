@@ -26,7 +26,7 @@ public static class DelegateGenerator
     {
         if (methodInfo.DeclaringType == null)
         {
-            throw new NullReferenceException("Method DeclaringType cannot be null");
+            throw new InvalidOperationException("Method DeclaringType cannot be null");
         }
 
         var typeBuilder = ModuleBuilder.DefineType(
@@ -56,7 +56,7 @@ public static class DelegateGenerator
 
         if (returnType == null)
         {
-            throw new NullReferenceException("Something went wrong creating delegate type");
+            throw new InvalidOperationException("Something went wrong creating delegate type");
         }
 
         return returnType;
